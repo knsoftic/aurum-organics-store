@@ -72,13 +72,14 @@
   }));
 
   // ---------- Palette ----------
-  function fromHex(hex) { const hs = AN.hexToHs(hex) || AN.hexToHs('#5a2ea6'); return AN.paletteFrom(hs.h, hs.s); }
-  function currentPalette() {
+  // Brand hue (h, s) the palette is built from; each look may add its own accent next to it.
+  function currentHue() {
     const c = cfg(), A = c.analysis;
-    if (c.palette.mode === 'custom') return fromHex(c.palette.primary || S.storeColor);
-    if (c.palette.mode === 'auto' && A && A.hue) return AN.paletteFrom(A.hue.h, A.hue.s);
-    return fromHex(S.storeColor);
+    if (c.palette.mode === 'custom') return AN.hexToHs(c.palette.primary || S.storeColor) || AN.hexToHs('#5a2ea6');
+    if (c.palette.mode === 'auto' && A && A.hue) return A.hue;
+    return AN.hexToHs(S.storeColor) || AN.hexToHs('#5a2ea6');
   }
+  function currentPalette() { const hs = currentHue(); return AN.paletteFrom(hs.h, hs.s); }
 
   // ================= 1 · MEDIA & ANALYSIS =================
   const ROLE_NAMES = { hero: 'Hero', wide: 'Benefits', square: 'Offer', thumb: 'Hook', clipOpen: 'Opener', clipHowto: 'How-to', clipWide: 'Landscape' };
@@ -94,7 +95,9 @@
       return `<div class="media-item ${m.enabled ? '' : 'off'}">${el}${focus}${meta}<label><input type="checkbox" data-toggle="${type}:${i}" ${m.enabled ? 'checked' : ''}> Use</label><div class="roles">${badges(m.path)}</div></div>`;
     };
     const pal = currentPalette();
+    const empty = !c.media.images.length;
     panel('media').innerHTML = `
+      ${empty ? `<div class="alert alert-info" style="font-size:13.5px"><strong>Step 1: add your product photos and videos.</strong> Click “+ Add photos or videos” below (you can select many at once). The studio then analyses them${S.aiProvider ? ' and the AI reads them to write your script' : ''}.</div>` : ''}
       <h4>Photos (${c.media.images.length})</h4>
       <div class="media-grid">${c.media.images.map((m, i) => item(m, i, 'images')).join('')}
         <label class="upload-tile"><input type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" multiple hidden data-upload>+ Add photos or videos</label></div>
@@ -155,16 +158,22 @@
     A.roles = AN.assignRoles(pickEnabled('images', A.images), pickEnabled('videos', A.videos));
   }
 
+  // One file per request so small server upload limits are never a problem.
   async function uploadMedia(files) {
-    if (!files || !files.length) return;
-    const fd = new FormData(); [...files].forEach((f) => fd.append('files[]', f));
-    toast('Uploading ' + files.length + ' file(s)…');
-    try {
-      const res = await api(S.routes.media, { body: fd });
-      cfg().media = res.media;
-      renderMedia();
-      await runAnalysis();
-    } catch (e) { toast(e.message, true); }
+    files = [...(files || [])];
+    if (!files.length) return;
+    let done = 0;
+    for (const f of files) {
+      busy(true, `Uploading ${done + 1}/${files.length}: ${f.name}`);
+      const fd = new FormData(); fd.append('files[]', f);
+      try { const res = await api(S.routes.media, { body: fd }); cfg().media = res.media; done++; renderMedia(); } catch (e) { toast(f.name + ': ' + e.message, true); }
+    }
+    busy(false);
+    if (!done) return;
+    toast(`${done} file(s) added — analysing…`);
+    await runAnalysis();
+    await rebuildPreview();
+    if (S.aiProvider && !cfg().meta.aiWrittenAt) await aiScript(null);
   }
 
   async function runAnalysis() {
@@ -224,11 +233,28 @@
         : type === 'number' ? (parseInt(v, 10) || 0) : v;
     dirty();
   });
+  // Middle frame of up to two clips, so the AI can "see" the videos too.
+  async function videoFrames() {
+    const frames = [];
+    for (const m of cfg().media.videos.filter((v) => v.enabled).slice(0, 2)) {
+      try {
+        const v = await E.loadVideo(url(m.path));
+        await E.seek(v, v.duration * 0.45);
+        const c = document.createElement('canvas'), s = 640 / Math.max(v.videoWidth, v.videoHeight);
+        c.width = Math.round(v.videoWidth * s); c.height = Math.round(v.videoHeight * s);
+        c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+        frames.push(c.toDataURL('image/jpeg', 0.8));
+      } catch (e) { console.warn(e); }
+    }
+    return frames;
+  }
+
   async function aiScript(btn) {
+    if (!cfg().media.images.some((m) => m.enabled)) { toast('Add product photos first — the AI reads them to write the script.', true); return; }
     if (btn) { btn.disabled = true; btn.textContent = '✨ Writing…'; }
-    busy(true, 'AI is writing a new script…');
+    busy(true, 'AI is reading your photos and writing a new script…');
     try {
-      const res = await api(S.routes.aiScript);
+      const res = await api(S.routes.aiScript, { json: { frames: await videoFrames() } });
       state.config.text = res.config.text; state.config.voice.lines = res.config.voice.lines; state.config.meta = res.config.meta || {};
       renderScript(); if (!panel('voice').hidden) renderVoice();
       toast('New script written — check the Urdu voice lines in step 3.');
@@ -478,7 +504,7 @@
         try { const b = await voiceBuffer(clip.path); bufs[key] = b; voiceDur[key] = b.duration; } catch (e) { console.warn(e); }
       }
     }
-    return { brand, t: c.text, media, voiceDur, buffers: bufs, v: T.variation(c.style.seed, c.style.preset) };
+    return { brand, t: c.text, media, voiceDur, buffers: bufs, hue: currentHue(), v: T.variation(c.style.seed, c.style.preset) };
   }
 
   const pCanvas = $('#previewCanvas'), pCtx = pCanvas.getContext('2d');
@@ -498,7 +524,7 @@
       previewComp = T.build($('#previewFormat').value, spec);
       pCanvas.width = previewComp.w; pCanvas.height = previewComp.h;
       const v = previewComp.v;
-      $('#previewLook').textContent = `${LOOK_NAMES[v.look]} · ${v.transition} transition · ${v.text} text · ${v.hero} photo · ${v.badge} badge`;
+      $('#previewLook').textContent = `${LOOK_NAMES[v.look]} · ${v.fontName} fonts · ${v.bg} background · ${v.transition} transition · ${v.text} text · ${v.hero} photo · ${v.badge} badge`;
       const slider = $('#previewTime'); slider.max = previewComp.duration.toFixed(2);
       await drawPreview(Math.min(parseFloat(slider.value) || 0, previewComp.duration - 0.05));
       busy(false);
@@ -540,15 +566,18 @@
   (async function boot() {
     renderMedia(); renderScript(); renderList(); fillPreviewSelect();
     busy(true, 'Loading fonts…');
-    await Promise.all(['900 100px Montserrat', '800 100px Montserrat', '700 100px Montserrat', 'italic 600 100px "Cormorant Garamond"', '500 40px Jost', '600 40px Jost', '600 40px "Noto Nastaliq Urdu"']
+    const faces = ['Montserrat', 'Poppins', 'Raleway', 'Outfit'].flatMap((f) => [900, 800, 700].map((w) => w + ' 100px ' + f))
+      .concat(['Cormorant Garamond', 'Playfair Display', 'Lora', 'DM Serif Display'].map((f) => 'italic 600 100px "' + f + '"'))
+      .concat(['500 40px Jost', '600 40px Jost', '500 40px Poppins', '600 40px Raleway', '600 40px Outfit', '600 40px "Noto Nastaliq Urdu"']);
+    await Promise.all(faces
       .map((f) => document.fonts.load(f, 'Aa مضبوط').catch(() => null)));
     const c = cfg();
     const known = c.analysis ? new Set([...Object.keys(c.analysis.images || {}), ...Object.keys(c.analysis.videos || {})]) : new Set();
     const stale = [...c.media.images, ...c.media.videos].some((m) => m.enabled && !known.has(m.path));
     if (stale && c.media.images.length) await runAnalysis();
     await rebuildPreview();
-    // First visit with an AI key: write a fresh script automatically.
-    if (S.aiProvider && !c.meta.aiWrittenAt) await aiScript(null);
+    // First visit with an AI key: write a fresh script automatically (once there are photos to read).
+    if (S.aiProvider && !c.meta.aiWrittenAt && c.media.images.some((m) => m.enabled)) await aiScript(null);
     window.__studioReady = true;
   })();
 })();

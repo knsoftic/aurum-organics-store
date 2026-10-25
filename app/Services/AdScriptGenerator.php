@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\PaymentMethod;
 use App\Models\Product;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
 /**
@@ -43,51 +44,106 @@ class AdScriptGenerator
         'S' => 'ایس', 'T' => 'ٹی', 'U' => 'یو', 'V' => 'وی', 'W' => 'ڈبلیو', 'X' => 'ایکس', 'Y' => 'وائی', 'Z' => 'زیڈ',
     ];
 
+    /** Ad config for a product from this store. */
     public function make(Product $product): array
     {
         $product->loadMissing(['images', 'category']);
+        $domain = preg_replace('/^www\./', '', (string) (parse_url(config('app.url'), PHP_URL_HOST) ?: request()->getHost()));
 
-        $html = (string) $product->description;
-        $text = Str::lower(strip_tags($product->name.'. '.$product->short_description.'. '.implode('. ', $product->highlights ?? []).'. '.$html.' '.$product->category?->name));
+        return $this->fromBrief([
+            'brand' => setting('store_name', config('app.name')),
+            'name' => $product->name,
+            'size' => (string) $product->size_label,
+            'price' => (float) $product->price,
+            'currency' => setting('currency_symbol', 'Rs.'),
+            'url' => $domain,
+            'html' => (string) $product->description,
+            'overview' => trim($product->short_description.'. '.implode('. ', $product->highlights ?? [])),
+            'highlights' => $product->highlights ?? [],
+            'category' => (string) $product->category?->name,
+            'freeDelivery' => (float) setting('shipping_fee', 0) <= 0,
+            'cod' => PaymentMethod::active()->where('type', PaymentMethod::TYPE_COD)->exists(),
+            'images' => collect([$product->image])->merge($product->images->pluck('path'))->filter()->unique()->values()->all(),
+            'videos' => $product->videos ?? [],
+        ]);
+    }
+
+    /**
+     * Ad config from a brief — works for products that are not in this store (other companies).
+     * Brief: brand, name, size, price, currency, url, cta, overview (plain text or HTML), html,
+     * highlights, category, freeDelivery, cod, deliveryArea, logo, images[], videos[].
+     */
+    public function fromBrief(array $b): array
+    {
+        $b += [
+            'brand' => '', 'name' => '', 'size' => '', 'price' => null, 'currency' => 'Rs.', 'url' => '', 'cta' => 'SHOP NOW',
+            'overview' => '', 'html' => '', 'highlights' => [], 'category' => '', 'freeDelivery' => false, 'cod' => false,
+            'deliveryArea' => 'all over Pakistan', 'logo' => null, 'images' => [], 'videos' => [],
+        ];
+        $html = $b['html'] ?: $this->overviewToHtml((string) $b['overview']);
+        $text = Str::lower(strip_tags($b['name'].'. '.$b['overview'].'. '.implode('. ', $b['highlights']).'. '.$html.' '.$b['category']));
         $isHair = Str::contains($text, ['hair', 'scalp']);
 
-        $brand = setting('store_name', config('app.name'));
-        $domain = parse_url(config('app.url'), PHP_URL_HOST) ?: request()->getHost();
-        $domain = preg_replace('/^www\./', '', (string) $domain);
-        $free = (float) setting('shipping_fee', 0) <= 0;
-        $cod = PaymentMethod::active()->where('type', PaymentMethod::TYPE_COD)->exists();
-        $price = number_format((float) $product->price, fmod((float) $product->price, 1.0) ? 2 : 0);
+        $brand = trim((string) $b['brand']) ?: 'Brand';
+        $name = trim((string) $b['name']);
+        $size = trim((string) $b['size']);
+        $domain = preg_replace(['#^https?://#', '#^www\.#', '#/.*$#'], '', trim((string) $b['url']));
+        $free = (bool) $b['freeDelivery'];
+        $cod = (bool) $b['cod'];
+        $priceValue = (float) $b['price'];
+        $price = $priceValue > 0 ? number_format($priceValue, fmod($priceValue, 1.0) ? 2 : 0) : '';
+        $area = trim((string) $b['deliveryArea']) ?: 'all over Pakistan';
+        $areaIsPakistan = Str::lower($area) === 'all over pakistan';
 
         $ingredients = $this->ingredients($html);
         $count = $this->herbCount($text, count($ingredients));
         $freeFrom = $this->freeFrom($text);
-        $benefits = $this->benefits($product, $html);
+        $benefits = $this->benefits($b['highlights'] ?: $this->sentences((string) $b['overview']), $html);
         $steps = $this->steps($html, $isHair);
-        [$line1, $line2] = $this->splitName($product->name);
+        [$line1, $line2] = $this->splitName($name);
 
         $brandUr = $this->urdu($brand);
-        $productUr = $this->urdu($product->name);
-        $domainUr = $this->urduDomain($domain, $brand, $brandUr);
+        $productUr = $this->urdu($name);
+        $domainUr = $domain ? $this->urduDomain($domain, $brand, $brandUr) : $brandUr;
         $ingredientsUr = array_values(array_filter(array_map(fn ($i) => self::URDU_WORDS[Str::lower($i)] ?? null, $ingredients)));
+        $currencyUr = in_array(Str::lower(trim((string) $b['currency'], ' .')), ['rs', 'pkr', '₨'], true) ? 'روپے' : $b['currency'];
 
-        $offerChips = array_values(array_filter([$cod ? 'Cash on Delivery' : null, Str::contains($text, ['100% natural', '100% organic', 'organic']) ? '100% Natural' : null, $product->size_label]));
+        $offerChips = array_values(array_filter([$cod ? 'Cash on Delivery' : null, Str::contains($text, ['100% natural', '100% organic', 'organic']) ? '100% Natural' : null, $size]));
+        $offerTitle = $free ? 'FREE DELIVERY' : ($cod ? 'CASH ON DELIVERY' : 'ORDER NOW');
+        $offerUrdu = match (true) {
+            $free && $areaIsPakistan => 'پورے پاکستان میں مفت ڈیلیوری',
+            $cod && $areaIsPakistan => 'پورے پاکستان میں کیش آن ڈیلیوری',
+            $free => 'مفت ڈیلیوری',
+            default => 'ابھی آرڈر کریں',
+        };
+
+        // e.g. "صرف 2,200 روپے میں، پورے پاکستان میں مفت ڈیلیوری اور کیش آن ڈیلیوری کے ساتھ۔ ابھی آرڈر کریں — …۔"
+        $extras = array_values(array_filter([
+            $free ? ($areaIsPakistan ? 'پورے پاکستان میں ' : '').'مفت ڈیلیوری' : null,
+            $cod ? 'کیش آن ڈیلیوری' : null,
+        ]));
+        $deal = $price ? "صرف {$price} {$currencyUr} میں" : '';
+        if ($extras) {
+            $deal .= ($deal ? '، ' : '').implode(' اور ', $extras).' کے ساتھ';
+        }
+        $offerLine = ($deal ? $deal.'۔ ' : '')."ابھی آرڈر کریں — {$domainUr}۔";
 
         return [
             'palette' => ['mode' => 'auto', 'primary' => null],
             'formats' => ['motion', 'footage', 'landscape'],
             'music' => ['enabled' => true, 'volume' => 0.8],
+            'brief' => Arr::except($b, ['html', 'images', 'videos']),
             'media' => [
-                'images' => collect([$product->image])->merge($product->images->pluck('path'))->filter()->unique()
-                    ->map(fn ($p) => ['path' => $p, 'enabled' => true])->values()->all(),
-                'videos' => collect($product->videos ?? [])->map(fn ($p) => ['path' => $p, 'enabled' => true])->values()->all(),
+                'images' => collect($b['images'])->filter()->unique()->map(fn ($p) => ['path' => $p, 'enabled' => true])->values()->all(),
+                'videos' => collect($b['videos'])->filter()->unique()->map(fn ($p) => ['path' => $p, 'enabled' => true])->values()->all(),
             ],
             'analysis' => null,
             'text' => [
                 'brand' => Str::upper($brand),
                 'url' => $domain,
-                'currency' => setting('currency_symbol', 'Rs.'),
+                'currency' => $b['currency'] ?: 'Rs.',
                 'price' => $price,
-                'size' => (string) $product->size_label,
+                'size' => $size,
                 'productLine1' => $line1,
                 'productLine2' => $line2,
                 'hook' => $isHair ? ['STRONGER,', 'SHINIER HAIR', 'STARTS AT'] : ['PURE.', 'NATURAL.', 'MADE WITH'],
@@ -104,7 +160,7 @@ class AdScriptGenerator
                     ['lines' => ['FEEL THE', 'DIFFERENCE', 'EVERY DAY'], 'accent' => 'naturally.', 'urdu' => 'ہر دن، قدرتی احساس'],
                 ],
                 'intro' => 'INTRODUCING',
-                'introChips' => array_values(array_filter([$product->size_label, $isHair ? 'Men & Women' : null, $isHair ? 'All hair types' : null])),
+                'introChips' => array_values(array_filter([$size, $isHair ? 'Men & Women' : null, $isHair ? 'All hair types' : null])),
                 'benefitsTitle' => 'Why you’ll love it',
                 'benefits' => $benefits,
                 'countNumber' => $count,
@@ -112,14 +168,14 @@ class AdScriptGenerator
                 'countUrdu' => $count ? $count.' سے زائد قدرتی جڑی بوٹیاں اور تیل' : '',
                 'tags' => array_slice($ingredients, 0, 12),
                 'freeFromLine' => $freeFrom ? Str::upper('No '.implode('  ·  No ', array_slice($freeFrom, 0, 3))) : '',
-                'offerTitle' => $free ? 'FREE DELIVERY' : 'CASH ON DELIVERY',
-                'offerSub' => 'all over Pakistan',
-                'offerUrdu' => $free ? 'پورے پاکستان میں مفت ڈیلیوری' : 'پورے پاکستان میں کیش آن ڈیلیوری',
+                'offerTitle' => $offerTitle,
+                'offerSub' => $free || $cod ? $area : ($domain ? 'at '.$domain : ''),
+                'offerUrdu' => $offerUrdu,
                 'offerChips' => array_slice($offerChips, 0, 3),
-                'cta' => 'SHOP NOW',
+                'cta' => Str::upper(trim((string) $b['cta']) ?: 'SHOP NOW'),
                 'meetTop' => 'MEET THE',
                 'meetBig' => $isHair ? 'Magic.' : 'Difference.',
-                'meetSub' => trim($brand.'  ·  '.$product->name.($product->size_label ? '  ·  '.$product->size_label : '')),
+                'meetSub' => trim($brand.'  ·  '.$name.($size ? '  ·  '.$size : '')),
                 'insideTitle1' => 'WHAT’S',
                 'insideTitle2' => 'inside?',
                 'inside' => collect($ingredients)->map(fn ($i) => [$i, self::INGREDIENT_BENEFITS[Str::lower($i)] ?? 'Natural goodness'])->take(6)->values()->all(),
@@ -156,25 +212,84 @@ class AdScriptGenerator
                     'howto' => $isHair
                         ? 'تھوڑا سا تیل سر کی جلد پر لگائیں، تین سے پانچ منٹ مساج کریں، اور ایک گھنٹہ یا رات بھر لگا رہنے دیں۔'
                         : 'استعمال کا طریقہ نہایت آسان ہے۔',
-                    'offer' => "صرف {$price} روپے میں"
-                        .($free ? '، پورے پاکستان میں مفت ڈیلیوری' : '')
-                        .($cod ? ($free ? ' اور' : '،').' کیش آن ڈیلیوری کے ساتھ' : '')
-                        ."۔ ابھی آرڈر کریں — {$domainUr}۔",
+                    'offer' => $offerLine,
                 ],
                 'clips' => [],
             ],
         ];
     }
 
-    /** "Magical Hair Oil" → ["Magical", "HAIR OIL"]. */
+    /**
+     * Plain-text overview → simple HTML so the same parsers work for typed briefs:
+     * "Benefits:" / "How to use:" headings, bullet or numbered lines, "Ingredients: a, b, c".
+     */
+    protected function overviewToHtml(string $plain): string
+    {
+        $plain = trim($plain);
+        if ($plain === '' || strip_tags($plain) !== $plain) {
+            return $plain;
+        }
+
+        $html = '';
+        $list = null;
+        $tag = 'ul';
+        $flush = function () use (&$html, &$list, &$tag) {
+            if ($list) {
+                $html .= "<{$tag}>".implode('', array_map(fn ($i) => '<li>'.e($i).'</li>', $list))."</{$tag}>";
+            }
+            $list = null;
+        };
+
+        foreach (preg_split('/\R/', $plain) as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                $flush();
+                continue;
+            }
+            if (preg_match('/^(?:key\s+)?(?:ingredients?|contains)\s*[:\-–]\s*(.+)$/iu', $line, $m)) {
+                $flush();
+                $html .= '<h3>Key ingredients</h3><p>'.e($m[1]).'</p>';
+            } elseif (preg_match('/^(why you.?ll love it|benefits?|features?|how to use|directions?|usage)\s*:?$/iu', $line, $m)) {
+                $flush();
+                $tag = preg_match('/use|direction|usage/i', $m[1]) ? 'ol' : 'ul';
+                $html .= '<h3>'.e(Str::ucfirst($m[1])).'</h3>';
+                $list = [];
+            } elseif (preg_match('/^(?:[-•*▪✓✔]|\d+[.)])\s*(.+)$/u', $line, $m)) {
+                if ($list === null) {
+                    $tag = 'ul';
+                    $html .= '<h3>Benefits</h3>';
+                    $list = [];
+                }
+                $list[] = $m[1];
+            } else {
+                $flush();
+                $html .= '<p>'.e($line).'</p>';
+            }
+        }
+        $flush();
+
+        return $html;
+    }
+
+    /** Short sentences from free text, used as benefit candidates. */
+    protected function sentences(string $text): array
+    {
+        return collect(preg_split('/[.!\n•]+/u', strip_tags($text)))
+            ->map(fn ($s) => trim($s, " -–*\t"))
+            ->filter(fn ($s) => mb_strlen($s) >= 6 && mb_strlen($s) <= 60)
+            ->values()->all();
+    }
+
+    /** "Magical Hair Oil" → ["Magical", "HAIR OIL"]; "Vitamin C Face Serum" → ["Vitamin C", "FACE SERUM"]. */
     protected function splitName(string $name): array
     {
         $words = preg_split('/\s+/', trim($name));
         if (count($words) < 2) {
             return [$name, ''];
         }
+        $tail = array_splice($words, count($words) >= 3 ? -2 : -1);
 
-        return [array_shift($words), Str::upper(implode(' ', $words))];
+        return [implode(' ', $words), Str::upper(implode(' ', $tail))];
     }
 
     protected function headingBlock(string $html, array $keywords, string $tag): ?string
@@ -236,14 +351,14 @@ class AdScriptGenerator
             ->values()->all();
     }
 
-    protected function benefits(Product $product, string $html): array
+    protected function benefits(array $highlights, string $html): array
     {
-        $short = array_filter($this->listItems($this->headingBlock($html, ['love', 'benefit'], 'ul')), fn ($b) => mb_strlen($b) <= 28);
+        $short = array_filter($this->listItems($this->headingBlock($html, ['love', 'benefit', 'feature'], 'ul')), fn ($b) => mb_strlen($b) <= 28);
         if (count($short) >= 3) {
             return array_slice(array_values($short), 0, 4);
         }
 
-        return collect($product->highlights ?? [])
+        return collect($highlights)
             ->map(fn ($h) => Str::ucfirst(trim(preg_split('/,| and | · /', $h)[0])))
             ->map(fn ($h) => Str::limit($h, 28, ''))
             ->take(4)->values()->all();
@@ -262,9 +377,18 @@ class AdScriptGenerator
         }
 
         return collect($items)->take(3)->map(function ($item) {
+            $item = trim($item, ' .');
+            if (mb_strlen($item) <= 24) {
+                return [Str::ucfirst($item), ''];
+            }
+            // Split at a natural break (comma / "and" / "then"), else after three words.
+            $parts = preg_split('/,\s*|\s+(?:and|then)\s+/i', $item, 2);
+            if (count($parts) === 2 && mb_strlen($parts[0]) <= 26) {
+                return [Str::ucfirst($parts[0]), Str::limit(Str::ucfirst($parts[1]), 42)];
+            }
             $words = preg_split('/\s+/', $item);
 
-            return [Str::ucfirst(implode(' ', array_slice($words, 0, 2))), Str::limit(implode(' ', array_slice($words, 2)), 42)];
+            return [Str::ucfirst(implode(' ', array_slice($words, 0, 3))), Str::limit(implode(' ', array_slice($words, 3)), 42)];
         })->all();
     }
 

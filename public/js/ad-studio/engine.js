@@ -16,8 +16,15 @@
   function setPalette(p) { Object.assign(C, p || {}); }
 
   // Look of the current video (see AdTemplates.variation): transitions, text motion, particles…
-  const V = { transition: 'sweep', text: 'rise', particles: 'bokeh', enhance: true };
-  function setVariation(v) { Object.assign(V, { transition: 'sweep', text: 'rise', particles: 'bokeh', enhance: true }, v || {}); }
+  const V = { transition: 'sweep', text: 'rise', particles: 'bokeh', bg: 'glow', enhance: true };
+  const DEFAULT_FONTS = { ...F };
+  function setVariation(v) {
+    // Reset everything a previous video may have changed (fonts, per-cut lists) before applying.
+    for (const k of Object.keys(V)) delete V[k];
+    Object.assign(V, { transition: 'sweep', text: 'rise', particles: 'bokeh', bg: 'glow', enhance: true }, v || {});
+    V.baseText = V.text;
+    Object.assign(F, DEFAULT_FONTS, (v && v.fonts) || {});
+  }
 
   // ---------- Math / easing ----------
   const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -214,11 +221,12 @@
   const PARTS = (() => { const r = rng(7); return Array.from({ length: 34 }, () => ({ x: r(), y: r(), s: r(), sp: 0.4 + r() * 0.8, ph: r() * 6.28, kind: r() })); })();
 
   function bgLight(ctx, W, H, t) {
-    const g = ctx.createLinearGradient(0, 0, W * 0.3, H);
+    const g = ctx.createLinearGradient(0, 0, W * (V.bg === 'split' ? 1 : 0.3), H);
     g.addColorStop(0, C.bg1); g.addColorStop(1, C.bg2);
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     glow(ctx, W * (0.25 + 0.08 * Math.sin(t * 0.5)), H * 0.22, Math.max(W, H) * 0.55, 'rgba(255,255,255,.95)', 0.9);
-    glow(ctx, W * (0.85 + 0.05 * Math.cos(t * 0.4)), H * 0.78, Math.max(W, H) * 0.5, C.glow, 0.55);
+    decorate(ctx, W, H, t, false);
+    if (V.bg === 'glow' || V.bg === 'dots') glow(ctx, W * (0.85 + 0.05 * Math.cos(t * 0.4)), H * 0.78, Math.max(W, H) * 0.5, C.glow, 0.55);
     particles(ctx, W, H, t, false);
   }
   function bgDark(ctx, W, H, t) {
@@ -226,7 +234,33 @@
     g.addColorStop(0, C.dark1); g.addColorStop(1, C.dark2);
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     glow(ctx, W * 0.5, H * 0.38, Math.max(W, H) * 0.55, C.glowDark, 0.55 + 0.1 * Math.sin(t * 1.3));
+    decorate(ctx, W, H, t, true);
     particles(ctx, W, H, t, true);
+  }
+
+  // Background decoration styles (V.bg): glow (plain), mesh blobs, diagonal stripes, dot grid, split panel.
+  function decorate(ctx, W, H, t, dark) {
+    const unit = Math.min(W, H);
+    ctx.save();
+    if (V.bg === 'mesh') {
+      [[0.15, 0.3, C.violet], [0.9, 0.15, C.lav], [0.7, 0.85, C.royal]].forEach(([x, y, c], i) => {
+        glow(ctx, W * (x + 0.04 * Math.sin(t * 0.6 + i)), H * (y + 0.03 * Math.cos(t * 0.5 + i)), unit * 0.75, c, dark ? 0.35 : 0.28);
+      });
+    } else if (V.bg === 'stripes') {
+      ctx.globalAlpha = dark ? 0.07 : 0.09; ctx.strokeStyle = dark ? '#fff' : C.violet; ctx.lineWidth = unit * 0.012;
+      const gap = unit * 0.07, off = (t * unit * 0.02) % gap;
+      for (let x = -H; x < W + H; x += gap) { ctx.beginPath(); ctx.moveTo(x + off, 0); ctx.lineTo(x + off - H * 0.6, H); ctx.stroke(); }
+    } else if (V.bg === 'dots') {
+      ctx.fillStyle = dark ? '#fff' : C.violet; ctx.globalAlpha = dark ? 0.12 : 0.13;
+      const gap = unit * 0.055, r = unit * 0.0045;
+      for (let y = gap / 2; y < H; y += gap) for (let x = gap / 2; x < W; x += gap) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+    } else if (V.bg === 'split') {
+      ctx.globalAlpha = dark ? 0.25 : 0.55; ctx.fillStyle = dark ? C.royal : C.lav;
+      ctx.beginPath(); ctx.moveTo(0, H * 0.62); ctx.lineTo(W, H * 0.48); ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = dark ? 0.35 : 0.6; ctx.strokeStyle = C.violet; ctx.lineWidth = unit * 0.004;
+      ctx.beginPath(); ctx.moveTo(0, H * 0.6); ctx.lineTo(W, H * 0.46); ctx.stroke();
+    }
+    ctx.restore();
   }
   function particles(ctx, W, H, t, dark) {
     const unit = Math.min(W, H);
@@ -271,10 +305,12 @@
   }
 
   // Scene-cut transitions; each fully covers the frame exactly at the cut.
-  function transition(ctx, W, H, t, at) {
+  function transition(ctx, W, H, t, at, index = 0) {
     const u = pr(t, at - 0.32, 0.64);
     if (u <= 0 || u >= 1) return;
-    if (V.transition === 'iris') {
+    // Each cut can use its own transition (V.transitions), else the video's single one.
+    const type = (V.transitions && V.transitions.length) ? V.transitions[(index - 1) % V.transitions.length] : V.transition;
+    if (type === 'iris') {
       const k = u < 0.5 ? ease.inOut(u * 2) : 1 - ease.inOut((u - 0.5) * 2);
       const R = Math.hypot(W, H) / 2 * k;
       ctx.save();
@@ -283,7 +319,7 @@
       ctx.restore();
       return;
     }
-    if (V.transition === 'slide') {
+    if (type === 'slide') {
       const k = u < 0.5 ? ease.inOut(u * 2) : 1 - ease.inOut((u - 0.5) * 2);
       const n = 4, colW = W / n;
       ctx.save();
@@ -296,7 +332,7 @@
       ctx.restore();
       return;
     }
-    if (V.transition === 'flash') {
+    if (type === 'flash') {
       const k = 1 - Math.abs(u - 0.5) * 2;
       ctx.save();
       ctx.globalAlpha = ease.inOut(clamp(k * 1.25)); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
@@ -316,9 +352,13 @@
 
   // ---------- Runner ----------
   async function drawFrame(ctx, comp, t, seekVideos = true) {
-    if (comp.v) setVariation(comp.v);
-    const scene = comp.scenes.find((s) => t >= s.from && t < s.to) || comp.scenes[comp.scenes.length - 1];
+    if (comp.v && V.seed !== comp.v.seed) setVariation(comp.v);
+    if (comp.palette) setPalette(comp.palette);
+    const index = Math.max(0, comp.scenes.findIndex((s) => t >= s.from && t < s.to));
+    const scene = comp.scenes[t >= comp.duration ? comp.scenes.length - 1 : index] || comp.scenes[comp.scenes.length - 1];
     const lt = t - scene.from;
+    // Each scene may animate its text differently (V.texts).
+    V.text = V.texts && V.texts.length ? V.texts[comp.scenes.indexOf(scene) % V.texts.length] : V.baseText;
     if (seekVideos && scene.clip && scene.clip.el) {
       const v = scene.clip.el; const d = Math.max(0.2, v.duration - 0.1);
       await seek(v, ((scene.clip.start || 0) + lt) % d);
@@ -326,7 +366,7 @@
     ctx.save();
     scene.draw(ctx, { W: comp.w, H: comp.h, t, lt, dur: scene.to - scene.from });
     ctx.restore();
-    comp.scenes.forEach((s, i) => { if (i > 0) transition(ctx, comp.w, comp.h, t, s.from); });
+    comp.scenes.forEach((s, i) => { if (i > 0) transition(ctx, comp.w, comp.h, t, s.from, i); });
   }
 
   async function renderMp4(canvas, comp, audioBuffer, onProgress) {

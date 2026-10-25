@@ -126,16 +126,47 @@
     energetic: { transition: ['flash', 'slide', 'iris'], text: ['pop', 'type'], hero: ['circle', 'tilt'], wide: ['full', 'tilt'], badge: ['burst'], particles: ['sparkle'], pace: 0.9 },
     minimal: { transition: ['slide', 'sweep'], text: ['rise', 'slide'], hero: ['round', 'arch'], wide: ['round', 'full'], badge: ['circle', 'ribbon'], particles: ['none', 'leaves'], pace: 1 },
   };
+  const FONT_PAIRS = [
+    { name: 'Classic', sans: 'Montserrat', serif: 'Cormorant Garamond', body: 'Jost' },
+    { name: 'Modern', sans: 'Poppins', serif: 'Playfair Display', body: 'Poppins' },
+    { name: 'Soft', sans: 'Raleway', serif: 'Lora', body: 'Raleway' },
+    { name: 'Clean', sans: 'Outfit', serif: 'DM Serif Display', body: 'Outfit' },
+  ];
+  const ALL = { transition: ['sweep', 'iris', 'slide', 'flash'], text: ['rise', 'slide', 'pop', 'type'], bg: ['glow', 'mesh', 'stripes', 'dots', 'split'] };
+
+  // Everything random about a video comes from its seed, so a look can be reproduced exactly.
   function variation(seed, preset = 'auto') {
     const r = E.rng(seed || 1), pick = (arr) => arr[Math.floor(r() * arr.length) % arr.length];
+    const chance = (p) => r() < p;
     const name = LOOKS[preset] ? preset : pick(Object.keys(LOOKS));
     const L = LOOKS[name];
+    const wild = preset === 'auto';
+    const fonts = pick(FONT_PAIRS);
+    // Per-cut transitions and per-scene text motion: mostly from the look, sometimes anything.
+    const transitions = Array.from({ length: 6 }, () => pick(wild && chance(0.35) ? ALL.transition : L.transition));
+    const texts = Array.from({ length: 6 }, () => pick(wild && chance(0.3) ? ALL.text : L.text));
     return {
-      seed, look: name,
-      transition: pick(L.transition), text: pick(L.text), hero: pick(L.hero), wide: pick(L.wide), badge: pick(L.badge), particles: pick(L.particles),
-      pace: L.pace, kb: r() < 0.5 ? 1 : -1, panX: r() * 2 - 1, darkHook: r() < 0.35, hookIndex: Math.floor(r() * 3), swapMiddle: r() < 0.4,
+      seed, look: name, fonts, fontName: fonts.name,
+      transition: transitions[0], transitions, text: texts[0], texts,
+      hero: pick(L.hero), wide: pick(L.wide), badge: pick(L.badge), particles: pick(L.particles),
+      bg: pick(name === 'minimal' ? ['glow', 'dots', 'split'] : ALL.bg),
+      accent: pick(['mono', 'mono', 'gold', 'warm', 'cool', 'complement']),
+      layouts: { hook: pick(['A', 'B']), reveal: pick(['A', 'B']), benefits: pick(['A', 'B']), offer: pick(['A', 'B']) },
+      mirror: chance(0.5),
+      pace: L.pace, kb: chance(0.5) ? 1 : -1, panX: r() * 2 - 1, darkHook: chance(0.35), hookIndex: Math.floor(r() * 3), swapMiddle: chance(0.4),
       music: Math.floor(r() * 4), enhance: true,
     };
+  }
+
+  // Accent colour per look: same brand hue, or a harmonious accent next to it.
+  function paletteFor(hue, accent) {
+    const AN = window.AdAnalyze, base = AN.paletteFrom(hue.h, hue.s);
+    let shift = { warm: 35, cool: -40, complement: 160 }[accent];
+    // Yellow/lime accents wash out on the light scenes, so turn the other way round the wheel.
+    const yellow = (h) => { h = (h + 360) % 360; return h > 48 && h < 85; };
+    if (shift && yellow(hue.h + shift)) shift = yellow(hue.h - shift) ? 0 : -shift;
+    const alt = accent === 'gold' ? AN.paletteFrom(42, 0.72) : shift ? AN.paletteFrom((hue.h + shift + 360) % 360, Math.max(0.5, hue.s)) : null;
+    return alt ? { ...base, violet: alt.violet, petal: alt.petal, glow: alt.glow, glowDark: alt.glowDark } : base;
   }
   const zoomFor = (S, p, strength = 0.14) => (S.v.kb > 0 ? lerp(1.02, 1 + strength, p) : lerp(1 + strength + 0.04, 1, ease.out(p)));
   function hookText(S) {
@@ -213,8 +244,82 @@
   // ===================== 9:16 (1080x1920) =====================
   function portraitScenes(S) {
     const t = S.t, M = S.media, B = S.brand;
+    const useB = (scene) => S.v.layouts && S.v.layouts[scene] === 'B';
+
+    // Alternative compositions, picked per video for more design variety.
+    const layoutB = {
+      // Big product photo on top, hook underneath.
+      hook(ctx, k) {
+        const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        const dark = S.v.darkHook, h0 = hookText(S);
+        const main = dark ? '#fff' : C.purple, accent = dark ? C.lav : C.violet, sub = dark ? C.lav : C.deep;
+        (dark ? bgDark : bgLight)(ctx, W, k.H, k.t);
+        const ap = ease.out(a(0, 0.8));
+        const shape = S.v.hero === 'circle' ? 'circle' : S.v.hero === 'arch' ? 'arch' : 'round';
+        card(ctx, M.hero || M.thumb, 200, 130 + (1 - ap) * -90, 680, 680, { shape, r: 60, zoom: zoomFor(S, pr(lt, 0, k.dur)), alpha: ap, panX: S.v.panX, sweep: pr(lt, 1.3, 1.0) });
+        logo(ctx, B, W / 2, 900, 70, main, ease.out(a(0.3, 0.5)));
+        const hook = h0.lines.slice(0, 3);
+        hook.forEach((s, i) => reveal(ctx, s, W / 2, 1030 + i * 106, { f: F.sans, w: 900, s: 96, c: main, ls: 2, max: 920 }, a(0.35 + i * 0.12, 0.7)));
+        const ay = 1030 + hook.length * 106 + 40;
+        reveal(ctx, h0.accent, W / 2, ay, { f: F.serif, w: 600, it: true, s: 150, c: accent, max: 940 }, a(0.75, 0.8));
+        txt(ctx, h0.urdu, W / 2, ay + 120, { f: F.urdu, w: 600, s: 48, c: sub, alpha: ease.out(a(1.2, 0.6)), dir: 'rtl', max: 940 });
+      },
+      // Full-bleed product photo with the name over a dark fade.
+      reveal(ctx, k) {
+        const { W, H, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        // Photo fills the top, fading into a solid dark band that carries the name.
+        const ph = 1400;
+        bgDark(ctx, W, H, k.t);
+        if (M.hero) cover(ctx, M.hero.el, 0, 0, W, ph, zoomFor(S, pr(lt, 0, k.dur), 0.12), (M.hero.fx ?? 0.5) + (S.v.panX || 0) * 0.04, M.hero.fy ?? 0.5);
+        const g = ctx.createLinearGradient(0, ph * 0.55, 0, ph);
+        g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, C.ink);
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, ph);
+        ctx.fillStyle = C.ink; ctx.fillRect(0, ph - 1, W, H - ph + 1);
+        const top = ctx.createLinearGradient(0, 0, 0, 380);
+        top.addColorStop(0, 'rgba(0,0,0,.45)'); top.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = top; ctx.fillRect(0, 0, W, 380);
+        sweepLight(ctx, 0, 0, W, ph, pr(lt, 1.0, 1.2));
+        logo(ctx, B, W / 2, 190, 84, '#fff', ease.out(a(0, 0.5)));
+        txt(ctx, t.intro, W / 2, 1230, { f: F.body, w: 600, s: 38, ls: 14, c: C.lav, alpha: ease.out(a(0.2, 0.5)) });
+        reveal(ctx, t.productLine1, W / 2, 1390, { f: F.serif, w: 600, it: true, s: 160, c: '#fff', max: 960 }, a(0.3, 0.7));
+        reveal(ctx, t.productLine2, W / 2, 1510, { f: F.sans, w: 900, s: 104, ls: 8, c: '#fff', max: 960 }, a(0.45, 0.7));
+        chipRow(ctx, t.introChips, W / 2, 1570, 72, 30, lt, 1.0, 0.15);
+      },
+      // Benefits first, photo below.
+      benefits(ctx, k) {
+        const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        bgLight(ctx, W, k.H, k.t);
+        reveal(ctx, t.benefitsTitle, W / 2, 300, { f: F.serif, w: 600, it: true, s: 104, c: C.purple, max: 940 }, a(0.1, 0.7));
+        lines(t.benefits).slice(0, 4).forEach((b, i) => benefitChip(ctx, b, 130, 370 + i * 118, 820, 96, a(0.4 + i * 0.4, 0.55)));
+        const ap = ease.out(a(0.9, 0.7)), wf = S.v.wide === 'full' ? 'round' : (S.v.wide || 'round');
+        card(ctx, M.wide, 90, 900 + (1 - ap) * 100, 900, 640, { shape: wf, r: 40, tilt: -0.035, zoom: zoomFor(S, pr(lt, 0, k.dur), 0.1), alpha: ap, panX: S.v.panX });
+      },
+      // Price front and centre.
+      offer(ctx, k) {
+        const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        bgLight(ctx, W, k.H, k.t);
+        logo(ctx, B, W / 2, 190, 80, C.purple, ease.out(a(0, 0.5)));
+        const ap = ease.out(a(0, 0.7));
+        card(ctx, M.square, 290, 270 + (1 - ap) * 60, 500, 500, { shape: 'circle', zoom: lerp(1.14, 1, ease.out(pr(lt, 0, 1.6))), alpha: ap });
+        if (t.price) {
+          const pp = a(0.35, 0.6);
+          ctx.save(); popScale(ctx, W / 2, 960, pp, 0.5); ctx.globalAlpha *= clamp(pp * 2);
+          txt(ctx, 'ONLY', W / 2, 870, { f: F.body, w: 600, s: 34, ls: 10, c: C.violet });
+          txt(ctx, (t.currency || 'Rs.') + ' ' + t.price, W / 2, 1010, { f: F.sans, w: 900, s: 170, c: C.purple, max: 940 });
+          ctx.restore();
+        }
+        reveal(ctx, t.offerTitle, W / 2, 1120, { f: F.sans, w: 900, s: 84, ls: 2, c: C.deep, max: 920 }, a(0.6, 0.6));
+        reveal(ctx, t.offerSub, W / 2, 1195, { f: F.serif, w: 600, it: true, s: 66, c: C.violet, max: 920 }, a(0.75, 0.6));
+        txt(ctx, t.offerUrdu, W / 2, 1275, { f: F.urdu, w: 600, s: 44, c: C.deep, alpha: ease.out(a(0.95, 0.6)), dir: 'rtl', max: 940 });
+        chipRow(ctx, t.offerChips, W / 2, 1305, 66, 28, lt, 1.1, 0.1);
+        ctaButton(ctx, 190, 1400, 700, 112, a(1.35, 0.6), lt - 1.9, t.cta);
+        txt(ctx, t.url, W / 2, 1575, { f: F.body, w: 600, s: 46, ls: 2, c: C.purple, alpha: ease.out(a(1.6, 0.6)), max: 940 });
+      },
+    };
+
     return {
       hook(ctx, k) {
+        if (useB('hook')) return layoutB.hook(ctx, k);
         const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
         const dark = S.v.darkHook, h0 = hookText(S);
         const main = dark ? '#fff' : C.purple, accent = dark ? C.lav : C.violet, sub = dark ? C.lav : C.deep;
@@ -239,6 +344,7 @@
         }
       },
       reveal(ctx, k) {
+        if (useB('reveal')) return layoutB.reveal(ctx, k);
         const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
         bgLight(ctx, W, k.H, k.t);
         glow(ctx, W / 2, 1110, 640, 'rgba(255,255,255,1)', 0.9);
@@ -250,6 +356,7 @@
         chipRow(ctx, t.introChips, W / 2, 1548, 76, 32, lt, 1.2, 0.15);
       },
       benefits(ctx, k) {
+        if (useB('benefits')) return layoutB.benefits(ctx, k);
         const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
         bgLight(ctx, W, k.H, k.t);
         const ap = ease.out(a(0, 0.7)), wf = S.v.wide || 'round', z = zoomFor(S, pr(lt, 0, k.dur), 0.1);
@@ -273,6 +380,7 @@
         txt(ctx, t.freeFromLine, W / 2, 1540, { f: F.body, w: 600, s: 30, ls: 3, c: C.lav, alpha: ease.out(a(1.7, 0.5)), max: 940 });
       },
       offer(ctx, k) {
+        if (useB('offer')) return layoutB.offer(ctx, k);
         const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
         bgLight(ctx, W, k.H, k.t);
         logo(ctx, B, W / 2, 200, 84, C.purple, ease.out(a(0, 0.5)));
@@ -361,39 +469,46 @@
         const dark = S.v.darkHook, h0 = hookText(S);
         const main = dark ? '#fff' : C.purple, accent = dark ? C.lav : C.violet, sub = dark ? C.lav : C.deep;
         (dark ? bgDark : bgLight)(ctx, W, H, k.t);
-        logo(ctx, B, 140, 140, 76, main, ease.out(a(0, 0.5)), 'left');
+        // Mirror: photo on the left, text on the right.
+        const tx = S.v.mirror ? 980 : 140, px = S.v.mirror ? 160 : 1184;
+        logo(ctx, B, tx, 140, 76, main, ease.out(a(0, 0.5)), 'left');
         const hook = h0.lines.slice(0, 3);
-        hook.forEach((s, i) => reveal(ctx, s, 140, 370 + i * 110, { f: F.sans, w: 900, s: 104, ls: 2, c: main, a: 'left', max: 900 }, a(0.12 + i * 0.14, 0.7)));
+        hook.forEach((s, i) => reveal(ctx, s, tx, 370 + i * 110, { f: F.sans, w: 900, s: 104, ls: 2, c: main, a: 'left', max: 860 }, a(0.12 + i * 0.14, 0.7)));
         const ay = 370 + hook.length * 110 + 70;
-        reveal(ctx, h0.accent, 140, ay, { f: F.serif, w: 600, it: true, s: 170, c: accent, a: 'left', max: 920 }, a(0.6, 0.8));
+        reveal(ctx, h0.accent, tx, ay, { f: F.serif, w: 600, it: true, s: 170, c: accent, a: 'left', max: 880 }, a(0.6, 0.8));
         const uw = 500 * ease.out(a(1.0, 0.6));
-        if (uw > 1 && h0.accent) { ctx.strokeStyle = accent; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(146, ay + 45); ctx.lineTo(146 + uw, ay + 45); ctx.stroke(); }
-        txt(ctx, h0.urdu, 146, Math.min(ay + 160, 1010), { f: F.urdu, w: 600, s: 48, c: sub, a: 'left', alpha: ease.out(a(1.2, 0.6)), max: 900 });
+        if (uw > 1 && h0.accent) { ctx.strokeStyle = accent; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(tx + 6, ay + 45); ctx.lineTo(tx + 6 + uw, ay + 45); ctx.stroke(); }
+        txt(ctx, h0.urdu, tx + 6, Math.min(ay + 160, 1010), { f: F.urdu, w: 600, s: 48, c: sub, a: 'left', alpha: ease.out(a(1.2, 0.6)), max: 860 });
         const ap = ease.out(a(0.25, 0.9));
-        if (!dark) glow(ctx, 1480, 560, 560, 'rgba(255,255,255,1)', 0.9);
-        heroFrame(ctx, S, 1184, 154 + (1 - ap) * 120, 640, 800, { zoom: zoomFor(S, pr(lt, 0.25, k.dur)), alpha: ap, sweep: pr(lt, 1.6, 1.0) });
+        if (!dark) glow(ctx, px + 300, 560, 560, 'rgba(255,255,255,1)', 0.9);
+        heroFrame(ctx, S, px, 154 + (1 - ap) * 120, 640, 800, { zoom: zoomFor(S, pr(lt, 0.25, k.dur)), alpha: ap, sweep: pr(lt, 1.6, 1.0) });
       },
       reveal(ctx, k) {
         const { W, H, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
         const bg = M.clipWide || M.wide || M.hero;
-        cover(ctx, bg.el, 0, 0, W, H, lerp(1.08, 1, ease.out(pr(lt, 0, k.dur))), bg.fx, bg.fy);
-        const g = ctx.createLinearGradient(0, 0, W * 0.7, 0);
+        // Photo on one side, name on a dark panel on the other, so the text never sits on the product.
+        const m = S.v.mirror, tx = m ? 1010 : 140, max = m ? 790 : 880, pw = 1050, px = m ? 0 : W - pw;
+        ctx.fillStyle = C.ink; ctx.fillRect(0, 0, W, H);
+        glow(ctx, m ? W - 420 : 420, H * 0.55, 720, C.glowDark, 0.35);
+        cover(ctx, bg.el, px, 0, pw, H, lerp(1.08, 1, ease.out(pr(lt, 0, k.dur))), bg.fx, bg.fy);
+        const g = m ? ctx.createLinearGradient(pw, 0, pw - 460, 0) : ctx.createLinearGradient(px, 0, px + 460, 0);
         g.addColorStop(0, C.ink); g.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.save(); ctx.globalAlpha = 0.94; ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore();
-        logo(ctx, B, 140, 140, 70, '#fff', ease.out(a(0, 0.5)), 'left');
-        txt(ctx, t.intro, 146, 390, { f: F.body, w: 600, s: 34, ls: 12, c: C.lav, a: 'left', alpha: ease.out(a(0.1, 0.5)) });
-        reveal(ctx, t.productLine1, 140, 560, { f: F.serif, w: 600, it: true, s: 180, c: '#fff', a: 'left', max: 1000 }, a(0.2, 0.7));
-        reveal(ctx, t.productLine2, 146, 690, { f: F.sans, w: 900, s: 124, ls: 8, c: '#fff', a: 'left', max: 1000 }, a(0.35, 0.7));
-        txt(ctx, (t.introChips || []).filter(Boolean).join('  ·  '), 148, 775, { f: F.body, w: 500, s: 36, c: C.lav, a: 'left', alpha: ease.out(a(0.9, 0.6)), max: 1000 });
+        ctx.fillStyle = g; ctx.fillRect(px, 0, pw, H);
+        logo(ctx, B, tx, 140, 70, '#fff', ease.out(a(0, 0.5)), 'left');
+        txt(ctx, t.intro, tx + 6, 390, { f: F.body, w: 600, s: 34, ls: 12, c: C.lav, a: 'left', alpha: ease.out(a(0.1, 0.5)) });
+        reveal(ctx, t.productLine1, tx, 560, { f: F.serif, w: 600, it: true, s: 180, c: '#fff', a: 'left', max }, a(0.2, 0.7));
+        reveal(ctx, t.productLine2, tx + 6, 690, { f: F.sans, w: 900, s: 124, ls: 8, c: '#fff', a: 'left', max }, a(0.35, 0.7));
+        txt(ctx, (t.introChips || []).filter(Boolean).join('  ·  '), tx + 8, 775, { f: F.body, w: 500, s: 36, c: C.lav, a: 'left', alpha: ease.out(a(0.9, 0.6)), max });
       },
       benefits(ctx, k) {
         const { W, H, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
         bgLight(ctx, W, H, k.t);
         const ap = ease.out(a(0, 0.7)), wf = S.v.wide || 'round', z = zoomFor(S, pr(lt, 0, k.dur), 0.1);
-        if (wf === 'full') card(ctx, M.wide, 0, 0, 1020, H, { shape: 'full', zoom: z, alpha: ap, panX: S.v.panX });
-        else card(ctx, M.wide, 120 + (1 - ap) * -60, 170, 880, 660, { shape: wf, r: 40, tilt: -0.035, zoom: z, alpha: ap, panX: S.v.panX });
-        reveal(ctx, t.benefitsTitle, 1100, 300, { f: F.serif, w: 600, it: true, s: 96, c: C.purple, a: 'left', max: 720 }, a(0.3, 0.7));
-        lines(t.benefits).slice(0, 4).forEach((b, i) => benefitChip(ctx, b, 1100, 360 + i * 122, 700, 96, a(0.65 + i * 0.42, 0.55)));
+        const m = S.v.mirror, cx = m ? 120 : 1100;
+        if (wf === 'full') card(ctx, M.wide, m ? 900 : 0, 0, 1020, H, { shape: 'full', zoom: z, alpha: ap, panX: S.v.panX });
+        else card(ctx, M.wide, (m ? 920 : 120) + (1 - ap) * (m ? 60 : -60), 170, 880, 660, { shape: wf, r: 40, tilt: m ? 0.035 : -0.035, zoom: z, alpha: ap, panX: S.v.panX });
+        reveal(ctx, t.benefitsTitle, cx, 300, { f: F.serif, w: 600, it: true, s: 96, c: C.purple, a: 'left', max: 720 }, a(0.3, 0.7));
+        lines(t.benefits).slice(0, 4).forEach((b, i) => benefitChip(ctx, b, cx, 360 + i * 122, 700, 96, a(0.65 + i * 0.42, 0.55)));
       },
       ingredients(ctx, k) {
         const { W, H, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
@@ -412,10 +527,10 @@
       offer(ctx, k) {
         const { W, H, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
         bgLight(ctx, W, H, k.t);
-        const ap = ease.out(a(0, 0.7));
-        card(ctx, M.square, 200, 160 + (1 - ap) * 60, 660, 650, { r: 44, zoom: lerp(1.14, 1, ease.out(pr(lt, 0, 1.6))), alpha: ap, sweep: pr(lt, 1.7, 1.0) });
-        priceBadge(ctx, t, 225, 760, 140, a(0.35, 0.6), k.t, S.v.badge);
-        const cx = 1360;
+        const ap = ease.out(a(0, 0.7)), m = S.v.mirror;
+        card(ctx, M.square, m ? 1060 : 200, 160 + (1 - ap) * 60, 660, 650, { r: 44, zoom: lerp(1.14, 1, ease.out(pr(lt, 0, 1.6))), alpha: ap, sweep: pr(lt, 1.7, 1.0) });
+        priceBadge(ctx, t, m ? 1695 : 225, 760, 140, a(0.35, 0.6), k.t, S.v.badge);
+        const cx = m ? 560 : 1360;
         logo(ctx, B, cx, 175, 70, C.purple, ease.out(a(0, 0.5)));
         reveal(ctx, t.offerTitle, cx, 360, { f: F.sans, w: 900, s: 100, ls: 2, c: C.purple, max: 940 }, a(0.6, 0.6));
         reveal(ctx, t.offerSub, cx, 450, { f: F.serif, w: 600, it: true, s: 80, c: C.violet, max: 940 }, a(0.75, 0.6));
@@ -476,6 +591,7 @@
     const offer = scenes[scenes.length - 1];
     return {
       format, w: W, h: H, duration: at, scenes, voices, v: S.v,
+      palette: S.hue ? paletteFor(S.hue, S.v.accent) : null,
       cues: {
         style: S.v.music,
         drop: scenes[1] ? scenes[1].from : 0,
@@ -486,5 +602,5 @@
     };
   }
 
-  window.AdTemplates = { build, PLANS, available, variation, LOOKS };
+  window.AdTemplates = { build, PLANS, available, variation, LOOKS, FONT_PAIRS };
 })();

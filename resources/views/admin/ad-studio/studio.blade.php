@@ -1,10 +1,11 @@
 @extends('layouts.admin')
 
 @section('title', 'Ad Studio')
-@section('crumb')<a href="{{ route('admin.ad-studio.index') }}">Ad Studio</a> / {{ $project->product?->name }}@endsection
+@section('crumb')<a href="{{ route('admin.ad-studio.index') }}">Ad Studio</a> / {{ $project->product?->name ?? ($project->config['brief']['name'] ?? '') }}@endsection
 
 @push('head')
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,600&family=Jost:wght@500;600&family=Montserrat:wght@700;800;900&family=Noto+Nastaliq+Urdu:wght@600&display=swap" rel="stylesheet">
+    {{-- Font pairs the ad looks rotate through (see FONT_PAIRS in templates.js). --}}
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,600&family=Jost:wght@500;600&family=Montserrat:wght@700;800;900&family=Poppins:wght@500;600;700;800;900&family=Playfair+Display:ital,wght@1,600&family=Raleway:wght@500;600;700;800;900&family=Lora:ital,wght@1,600&family=Outfit:wght@500;600;700;800;900&family=DM+Serif+Display:ital@1&family=Noto+Nastaliq+Urdu:wght@600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('css/ad-studio.css') }}?v={{ filemtime(public_path('css/ad-studio.css')) }}">
 @endpush
 
@@ -19,7 +20,11 @@
         'title' => $project->title,
         'config' => $project->config,
         'uploads' => rtrim(asset('uploads'), '/'),
-        'brandMark' => setting('brand_mark') ? media_url(setting('brand_mark')) : null,
+        // Custom (other company) projects use their own logo; store products use the store's icon.
+        'brandMark' => ! empty($project->config['brief']['logo'])
+            ? media_url($project->config['brief']['logo'])
+            : ($project->product_id && setting('brand_mark') ? media_url(setting('brand_mark')) : null),
+        'isCustom' => ! $project->product_id,
         'storeColor' => $themeColors[setting('theme', 'emerald')] ?? '#5a2ea6',
         'ttsReady' => (bool) $ttsProvider,
         'ttsProvider' => $ttsProvider,

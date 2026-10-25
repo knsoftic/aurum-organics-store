@@ -47,6 +47,46 @@ class AdStudioController extends Controller
         return redirect()->route('admin.ad-studio.show', $project);
     }
 
+    /** Ad for a product that is not in this store (another company / brand). */
+    public function storeCustom(Request $request, AdScriptGenerator $generator)
+    {
+        $data = $request->validate([
+            'brand' => 'required|string|max:80',
+            'name' => 'required|string|max:120',
+            'size' => 'nullable|string|max:30',
+            'price' => 'nullable|numeric|min:0|max:99999999',
+            'currency' => 'nullable|string|max:8',
+            'url' => 'nullable|string|max:200',
+            'cta' => 'nullable|string|max:24',
+            'delivery_area' => 'nullable|string|max:60',
+            'overview' => 'nullable|string|max:6000',
+            'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
+        ]);
+
+        $brief = [
+            'brand' => $data['brand'],
+            'name' => $data['name'],
+            'size' => $data['size'] ?? '',
+            'price' => $data['price'] ?? null,
+            'currency' => ($data['currency'] ?? null) ?: setting('currency_symbol', 'Rs.'),
+            'url' => $data['url'] ?? '',
+            'cta' => ($data['cta'] ?? null) ?: 'SHOP NOW',
+            'deliveryArea' => ($data['delivery_area'] ?? null) ?: 'all over Pakistan',
+            'overview' => $data['overview'] ?? '',
+            'freeDelivery' => $request->boolean('free_delivery'),
+            'cod' => $request->boolean('cod'),
+            'logo' => $request->hasFile('logo') ? $this->storeUpload($request->file('logo'), 'ads/logos') : null,
+        ];
+
+        $project = AdProject::create([
+            'title' => $data['brand'].' — '.$data['name'],
+            'product_id' => null,
+            'config' => $generator->fromBrief($brief),
+        ]);
+
+        return redirect()->route('admin.ad-studio.show', $project)->with('success', 'Project created — now add the product photos and videos.');
+    }
+
     public function show(AdProject $adProject)
     {
         return view('admin.ad-studio.studio', [
@@ -74,13 +114,13 @@ class AdStudioController extends Controller
         return response()->json(['saved' => true]);
     }
 
-    /** Rebuild text + voice lines from the latest product data (media and voice clips are kept). */
+    /** Rebuild text + voice lines from the latest product data / brief (media and voice clips are kept). */
     public function regenerate(AdProject $adProject, AdScriptGenerator $generator)
     {
-        abort_unless($adProject->product, 422, 'This project has no product.');
-
-        $fresh = $generator->make($adProject->product);
         $config = $adProject->config;
+        $fresh = $adProject->product
+            ? $generator->make($adProject->product)
+            : $generator->fromBrief($config['brief'] ?? []);
         $config['text'] = $fresh['text'];
         $config['voice']['lines'] = $fresh['voice']['lines'];
         $adProject->update(['config' => $config]);
@@ -138,11 +178,23 @@ class AdStudioController extends Controller
         return response()->json($this->saveClip($adProject, $data['key'], $path, 'tts'));
     }
 
-    /** Fresh English text + Urdu voice script written by AI (Gemini / OpenAI). */
-    public function aiScript(AdProject $adProject, AiScriptWriter $writer)
+    /** Fresh English text + Urdu voice script written by AI, which also looks at the photos and video frames. */
+    public function aiScript(Request $request, AdProject $adProject, AiScriptWriter $writer)
     {
+        $request->validate([
+            'frames' => 'nullable|array|max:2',
+            'frames.*' => 'string|max:1500000|starts_with:data:image/jpeg;base64,',
+        ]);
+
+        $images = collect($adProject->config['media']['images'] ?? [])
+            ->filter(fn ($m) => $m['enabled'] ?? true)->take(4)
+            ->map(fn ($m) => AiScriptWriter::imageForAi($m['path']))->filter()->values()->all();
+        foreach ((array) $request->input('frames', []) as $frame) {
+            $images[] = ['mime' => 'image/jpeg', 'data' => substr($frame, strlen('data:image/jpeg;base64,'))];
+        }
+
         try {
-            $config = $writer->write($adProject->load('product'));
+            $config = $writer->write($adProject->load('product'), $images);
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

@@ -97,6 +97,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::controller(Admin\AdStudioController::class)->prefix('ad-studio')->name('ad-studio.')->group(function () {
             Route::get('/', 'index')->name('index');
             Route::post('/', 'store')->name('store');
+            Route::post('custom', 'storeCustom')->name('store-custom');
             Route::get('{adProject}', 'show')->name('show');
             Route::put('{adProject}', 'update')->name('update');
             Route::delete('{adProject}', 'destroy')->name('destroy');

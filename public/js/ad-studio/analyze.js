@@ -93,10 +93,11 @@
 
   // Full palette from a single hue/saturation.
   function paletteFrom(h, s) {
+    // Yellow is far brighter than other hues at the same lightness, so its accent is darkened to stay readable.
     s = E.clamp(s, 0, 0.85);
     return {
       ink: hsl(h, s * 0.6, 0.11), deep: hsl(h, s * 0.9, 0.17), purple: hsl(h, s, 0.27), royal: hsl(h, s, 0.38),
-      violet: hsl(h, Math.min(1, s + 0.1), 0.53), lav: hsl(h, s * 0.7, 0.84), lavLight: hsl(h, s * 0.6, 0.95),
+      violet: hsl(h, Math.min(1, s + 0.1), h > 45 && h < 80 ? 0.42 : 0.53), lav: hsl(h, s * 0.7, 0.84), lavLight: hsl(h, s * 0.6, 0.95),
       muted: hsl(h, 0.1, 0.45), bg1: hsl(h, s * 0.6, 0.97), bg2: hsl(h, s * 0.55, 0.86),
       dark1: hsl(h, s * 0.8, 0.25), dark2: hsl(h, s * 0.9, 0.09),
       glow: hsl(h, s, 0.62, 0.55), glowDark: hsl(h, s, 0.66, 0.55),
