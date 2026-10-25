@@ -140,6 +140,8 @@ nano .env
 ```dotenv
 APP_NAME="KN Organic"
 APP_ENV=production
+# Khali chhor dein — "php artisan key:generate" khud bharega. Yeh line HATAYEIN NAHI.
+APP_KEY=
 APP_DEBUG=false
 APP_URL=https://knorganic.site
 APP_TIMEZONE=Asia/Karachi
@@ -328,6 +330,7 @@ Sab se ahem cheezein:
 | **Home page chalta hai lekin `/shop`, `/admin` par 404** | URL rewrite set nahi — section 9.2. |
 | **Laravel ki files ki list ya "403 Forbidden"** | Running directory `/public` set nahi — section 9.1. |
 | **"No application encryption key"** | `php artisan key:generate` phir `php artisan optimize`. |
+| **"Unable to set application key. No APP_KEY variable was found"** | `.env` mein `APP_KEY=` wali line hi nahi hai. Yeh chalayein: `printf '\nAPP_KEY=\n' >> .env && php artisan optimize:clear && php artisan key:generate --force && php artisan optimize` |
 | **Image / screenshot upload fail, "Unable to guess the MIME type"** | `fileinfo` extension install karein — section 2.1. |
 | **Composer: "putenv() has been disabled"** | Disabled functions se `putenv`, `proc_open` hatayein — section 2.2. |
 | **"413 Request Entity Too Large"** | **Website → Conf → Config file** mein `client_max_body_size 20m;` aur PHP upload limit (section 2.3). |
