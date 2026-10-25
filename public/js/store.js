@@ -47,7 +47,8 @@
   const header = $('#siteHeader');
   const onScroll = () => header && header.classList.toggle('scrolled', window.scrollY > 10);
   window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
+  // Reading scrollY right away would force the first layout inside this script; wait for load.
+  window.addEventListener('load', onScroll);
 
   /* ---------- AJAX cart ---------- */
   async function cartRequest(url, method, body) {
@@ -131,10 +132,30 @@
         $$('[data-gallery-thumb]', gallery).forEach((t) => t.classList.remove('active'));
         thumb.classList.add('active');
         main.style.opacity = 0;
-        setTimeout(() => { main.src = thumb.dataset.src; main.style.opacity = 1; }, 180);
+        setTimeout(() => {
+          if (thumb.dataset.srcset) main.srcset = thumb.dataset.srcset; else main.removeAttribute('srcset');
+          main.src = thumb.dataset.src; main.style.opacity = 1;
+        }, 180);
       });
     });
   });
+
+  /* ---------- Videos load only when they come near the screen ---------- */
+  const loadVideo = (video) => {
+    if (!video.dataset.src) return;
+    video.src = video.dataset.src;
+    video.preload = 'metadata';
+    delete video.dataset.src;
+  };
+  const lazyVideos = $$('video[data-src]');
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => entries.forEach((entry) => {
+      if (entry.isIntersecting) { loadVideo(entry.target); io.unobserve(entry.target); }
+    }), { rootMargin: '300px' });
+    lazyVideos.forEach((v) => io.observe(v));
+  } else {
+    lazyVideos.forEach(loadVideo);
+  }
 
   /* ---------- Click-to-play videos (one at a time, with sound) ---------- */
   document.addEventListener('click', (e) => {
@@ -152,6 +173,7 @@
       v.pause(); v.controls = false; other.classList.remove('playing');
     });
     const video = card.querySelector('video');
+    loadVideo(video);
     video.muted = false;
     video.controls = true;
     card.classList.add('playing');
@@ -178,24 +200,24 @@
   });
 
   /* ---------- Reveal on scroll ---------- */
-  // Scroll-position check (more reliable than IntersectionObserver on jumpy scrolls / anchor links).
-  let pending = $$('.reveal');
-  let ticking = false;
-  function revealCheck() {
-    ticking = false;
-    const limit = window.innerHeight * 0.94;
-    pending = pending.filter((el) => {
-      if (el.getBoundingClientRect().top < limit) { el.classList.add('in'); return false; }
-      return true;
-    });
-    if (!pending.length) window.removeEventListener('scroll', onRevealScroll);
+  // IntersectionObserver never forces a layout, so sections below the fold stay un-laid-out
+  // (content-visibility) until needed. When something comes into view, everything before it
+  // in the page is revealed too, so jumping to #faq or #story never leaves blank blocks behind.
+  const reveals = $$('.reveal');
+  if ('IntersectionObserver' in window) {
+    const revealIo = new IntersectionObserver((entries) => {
+      let last = -1;
+      entries.forEach((e) => {
+        if (e.isIntersecting || e.boundingClientRect.bottom < 0) last = Math.max(last, reveals.indexOf(e.target));
+      });
+      for (let i = 0; i <= last; i++) {
+        if (!reveals[i].classList.contains('in')) { reveals[i].classList.add('in'); revealIo.unobserve(reveals[i]); }
+      }
+    }, { rootMargin: '0px 0px -6% 0px' });
+    reveals.forEach((el) => revealIo.observe(el));
+  } else {
+    reveals.forEach((el) => el.classList.add('in'));
   }
-  function onRevealScroll() { if (!ticking) { ticking = true; requestAnimationFrame(revealCheck); } }
-  window.addEventListener('scroll', onRevealScroll, { passive: true });
-  window.addEventListener('resize', onRevealScroll);
-  revealCheck();
-  // Anything above the current scroll position (e.g. after a jump) must be visible too.
-  window.addEventListener('load', revealCheck);
 
   /* ---------- Prevent double submit ---------- */
   document.addEventListener('submit', (e) => {

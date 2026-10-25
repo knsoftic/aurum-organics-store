@@ -163,7 +163,7 @@
                 <h3 style="font-size:28px">Your Order</h3>
                 @foreach ($items as $item)
                     <div class="summary-item">
-                        <div class="thumb"><img src="{{ $item->product->image_url }}" alt=""><span class="q">{{ $item->qty }}</span></div>
+                        <div class="thumb"><img src="{{ media_webp($item->product->image_url, 200) }}" alt=""><span class="q">{{ $item->qty }}</span></div>
                         <div><h4>{{ $item->product->name }}</h4><small>{{ $item->product->size_label }}</small></div>
                         <span>{{ money($item->total) }}</span>
                     </div>

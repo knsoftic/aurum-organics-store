@@ -101,3 +101,30 @@ if (! function_exists('country_name')) {
         return config('countries.'.strtoupper($code), strtoupper($code));
     }
 }
+
+if (! function_exists('media_webp')) {
+    /** Small WebP copy of an uploaded photo (thumbnails, logo icon). */
+    function media_webp(?string $url, int $width): string
+    {
+        return \App\Services\ImageOptimizer::url($url, $width);
+    }
+}
+
+if (! function_exists('inline_css')) {
+    /** A public stylesheet, lightly minified, for inlining in <head> (cached until the file changes). */
+    function inline_css(string $file): string
+    {
+        $path = public_path($file);
+        if (! is_file($path)) {
+            return '';
+        }
+
+        return \Illuminate\Support\Facades\Cache::rememberForever('inline_css.'.md5($file).'.'.filemtime($path), function () use ($path) {
+            $css = preg_replace('#/\*.*?\*/#s', '', file_get_contents($path));
+            $css = preg_replace('/\s+/', ' ', $css);
+            $css = preg_replace('/\s*([{};])\s*/', '$1', $css);
+
+            return str_replace('</style', '<\/style', trim($css));
+        });
+    }
+}

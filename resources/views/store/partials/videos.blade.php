@@ -4,7 +4,8 @@
     <div class="video-grid" data-video-track>
         @foreach ($urls as $i => $url)
             <div class="video-card" data-video>
-                <video src="{{ $url }}#t=0.5" preload="metadata" playsinline loop muted></video>
+                {{-- The video file loads only when the card scrolls near the screen (store.js). --}}
+                <video data-src="{{ $url }}#t=0.5" preload="none" playsinline loop muted></video>
                 <button type="button" class="play" aria-label="Play video {{ $i + 1 }}"><span><x-icon name="play" /></span></button>
             </div>
         @endforeach

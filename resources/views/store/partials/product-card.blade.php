@@ -3,8 +3,8 @@
     <a href="{{ route('product.show', $product) }}" class="product-media" aria-label="{{ $product->name }}">
         @if ($product->badge)<span class="badge">{{ $product->badge }}</span>@endif
         @if ($product->discount_percent)<span class="badge sale">−{{ $product->discount_percent }}%</span>@endif
-        <img class="main" src="{{ $gallery[0] }}" alt="{{ $product->name }}" loading="lazy">
-        @if (isset($gallery[1]))<img class="alt" src="{{ $gallery[1] }}" alt="" loading="lazy">@endif
+        <x-img class="main" :src="$gallery[0]" :alt="$product->name" sizes="(max-width: 640px) 50vw, 25vw" :widths="[400, 800]" />
+        @if (isset($gallery[1]))<x-img class="alt" :src="$gallery[1]" sizes="(max-width: 640px) 50vw, 25vw" :widths="[400, 800]" />@endif
     </a>
     <div class="quick-add">
         @if ($product->isInStock())

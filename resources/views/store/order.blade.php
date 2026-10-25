@@ -145,7 +145,7 @@
                 <h3 style="font-size:28px">Summary</h3>
                 @foreach ($order->items as $item)
                     <div class="summary-item">
-                        <div class="thumb"><img src="{{ $item->image_url }}" alt=""><span class="q">{{ $item->quantity }}</span></div>
+                        <div class="thumb"><img src="{{ media_webp($item->image_url, 200) }}" alt=""><span class="q">{{ $item->quantity }}</span></div>
                         <div><h4>{{ $item->product_name }}</h4><small>{{ $item->size_label }} · {{ money($item->price) }}</small></div>
                         <span>{{ money($item->total) }}</span>
                     </div>

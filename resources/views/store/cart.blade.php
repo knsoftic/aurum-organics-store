@@ -31,7 +31,7 @@
                                 <tr>
                                     <td>
                                         <div class="cart-product">
-                                            <a href="{{ route('product.show', $item->product) }}"><img src="{{ $item->product->image_url }}" alt="{{ $item->product->name }}"></a>
+                                            <a href="{{ route('product.show', $item->product) }}"><img src="{{ media_webp($item->product->image_url, 200) }}" alt="{{ $item->product->name }}" loading="lazy"></a>
                                             <div>
                                                 <h3><a href="{{ route('product.show', $item->product) }}">{{ $item->product->name }}</a></h3>
                                                 <div class="muted" style="font-size:14px">{{ $item->product->size_label }} · {{ money($item->product->price) }}</div>

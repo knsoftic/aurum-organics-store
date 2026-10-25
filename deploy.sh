@@ -33,6 +33,9 @@ COMPOSER_ALLOW_SUPERUSER=1 "$PHP_BIN" "$(command -v composer)" install --no-dev 
 echo "==> Database migrations (data safe rehta hai)"
 "$PHP_BIN" artisan migrate --force
 
+echo "==> Photos: fast WebP copies"
+"$PHP_BIN" artisan images:optimize || true
+
 echo "==> Cache rebuild"
 "$PHP_BIN" artisan optimize:clear
 "$PHP_BIN" artisan optimize

@@ -66,6 +66,8 @@
     ]))];
 @endphp
 
+@push('preload')<x-preload-img :src="$gallery[0]" sizes="(max-width: 900px) min(620px, 100vw), 50vw" />@endpush
+
 @push('head')
 <script type="application/ld+json">{!! json_encode($productSchema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) !!}</script>
 <script type="application/ld+json">{!! json_encode($breadcrumbs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) !!}</script>
@@ -89,15 +91,16 @@
             @if (count($gallery) > 1)
                 <div class="gallery-thumbs">
                     @foreach ($gallery as $i => $url)
-                        <button type="button" class="{{ $i === 0 ? 'active' : '' }}" data-gallery-thumb data-src="{{ $url }}" aria-label="Image {{ $i + 1 }}">
-                            <img src="{{ $url }}" alt="{{ $product->name }} — photo {{ $i + 1 }}" loading="lazy">
+                        @php $full = \App\Services\ImageOptimizer::responsive($url); @endphp
+                        <button type="button" class="{{ $i === 0 ? 'active' : '' }}" data-gallery-thumb data-src="{{ $full['src'] }}" data-srcset="{{ $full['srcset'] }}" aria-label="Image {{ $i + 1 }}">
+                            <img src="{{ media_webp($url, 200) }}" alt="{{ $product->name }} — photo {{ $i + 1 }}" width="84" height="84" loading="lazy" decoding="async">
                         </button>
                     @endforeach
                 </div>
             @endif
             <div class="gallery-main" style="{{ count($gallery) > 1 ? '' : 'grid-column:1/-1' }}">
                 @if ($product->badge)<span class="badge">{{ $product->badge }}</span>@endif
-                <img src="{{ $gallery[0] }}" alt="{{ $product->name }}" data-gallery-main>
+                <x-img :src="$gallery[0]" :alt="$product->name" sizes="(max-width: 900px) min(620px, 100vw), 50vw" priority data-gallery-main />
             </div>
         </div>
 

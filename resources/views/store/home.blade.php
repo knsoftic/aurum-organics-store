@@ -18,12 +18,17 @@
     $videoUrls = $products->flatMap(fn ($p) => $p->video_urls)->unique()->take(6)->values();
 @endphp
 
+@if ($heroImage)
+    @push('preload')<x-preload-img :src="$heroImage" :sizes="$heroArch ? '(max-width: 900px) 340px, 500px' : '(max-width: 900px) 320px, 560px'" />@endpush
+@endif
+
 @section('content')
 
 {{-- ================= HERO ================= --}}
 <section class="hero">
     <div class="container hero-grid">
-        <div class="hero-copy reveal">
+        {{-- Above the fold: shown immediately (no reveal) so the first paint is fast. --}}
+        <div class="hero-copy">
             <span class="eyebrow">{{ setting('hero_eyebrow', 'Pure · Natural · Organic') }}</span>
             <h1 class="display">{!! $fancy(setting('hero_title', 'Nature, bottled with care.')) !!}</h1>
             <p class="lead">{{ setting('hero_subtitle') }}</p>
@@ -41,12 +46,12 @@
                 </div>
             @endif
         </div>
-        <div class="hero-visual reveal reveal-delay-2 {{ $heroArch ? 'is-arch' : '' }}">
+        <div class="hero-visual {{ $heroArch ? 'is-arch' : '' }}">
             @if ($heroImage)
                 @if ($heroArch)
-                    <div class="arch"><img src="{{ $heroImage }}" alt="{{ setting('store_name') }}"></div>
+                    <div class="arch"><x-img :src="$heroImage" :alt="setting('store_name')" sizes="(max-width: 900px) 340px, 500px" priority /></div>
                 @else
-                    <img src="{{ $heroImage }}" alt="{{ setting('store_name') }}">
+                    <x-img :src="$heroImage" :alt="setting('store_name')" sizes="(max-width: 900px) 320px, 560px" priority />
                 @endif
             @endif
             @if (setting('hero_badge_title', 'Quality Assured'))
@@ -76,7 +81,7 @@
     <section class="section">
         <div class="container spotlight">
             <div class="spotlight-media reveal">
-                <img src="{{ $hero->gallery[1] ?? $hero->image_url }}" alt="{{ $hero->name }}">
+                <x-img :src="$hero->gallery[1] ?? $hero->image_url" :alt="$hero->name" sizes="(max-width: 900px) 100vw, 50vw" />
             </div>
             <div class="reveal reveal-delay-1">
                 <span class="eyebrow">{{ $category?->name ?? 'Signature' }}</span>
@@ -142,7 +147,7 @@
 <section class="section bg-cream" id="story">
     <div class="container story">
         <div class="story-media reveal">
-            <img src="{{ setting('about_image') ? media_url(setting('about_image')) : ($hero?->image_url ?? media_url(null)) }}" alt="Our story">
+            <x-img :src="setting('about_image') ? media_url(setting('about_image')) : ($hero?->image_url ?? media_url(null))" alt="Our story" sizes="(max-width: 900px) 100vw, 50vw" />
         </div>
         <div class="story-copy reveal reveal-delay-1">
             <span class="eyebrow">{{ setting('about_eyebrow', 'Our Story') }}</span>

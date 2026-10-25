@@ -13,6 +13,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    {{-- The main photo of the page (pushed by the page) starts downloading before anything else. --}}
+    @stack('preload')
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <script>document.documentElement.classList.add('js')</script>
     <title>{{ $fullTitle }}</title>
@@ -34,10 +36,15 @@
     @endif
     <link rel="icon" href="{{ setting('favicon') ? media_url(setting('favicon')) : asset('favicon.ico') }}">
     <meta name="theme-color" content="{{ ['lavender' => '#3b1a6b', 'noir' => '#161616', 'ivory' => '#4b4537', 'rose' => '#4a2a2f'][setting('theme')] ?? '#1f3a2e' }}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('css/store.css') }}?v={{ filemtime(public_path('css/store.css')) }}">
+    {{-- Fonts are served from this site and the stylesheet is inlined, so nothing blocks the first paint. --}}
+    <link rel="preload" href="{{ asset('fonts/jost.woff2') }}" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{{ asset('fonts/cormorant-garamond.woff2') }}" as="font" type="font/woff2" crossorigin>
+    <style>
+        @font-face { font-family: 'Cormorant Garamond'; font-style: normal; font-weight: 400 600; font-display: swap; src: url({{ asset('fonts/cormorant-garamond.woff2') }}) format('woff2'); }
+        @font-face { font-family: 'Cormorant Garamond'; font-style: italic; font-weight: 400 500; font-display: swap; src: url({{ asset('fonts/cormorant-garamond-italic.woff2') }}) format('woff2'); }
+        @font-face { font-family: 'Jost'; font-style: normal; font-weight: 300 600; font-display: swap; src: url({{ asset('fonts/jost.woff2') }}) format('woff2'); }
+        {!! inline_css('css/store.css') !!}
+    </style>
     @include('store.partials.schema-site')
     @stack('head')
     @include('store.partials.tracking-head')
@@ -174,7 +181,7 @@
 <script>
     window.Store = { csrf: '{{ csrf_token() }}', flash: @json(session('success') ?? session('error')), flashType: '{{ session('error') ? 'error' : 'success' }}' };
 </script>
-<script src="{{ asset('js/store.js') }}?v={{ filemtime(public_path('js/store.js')) }}"></script>
+<script src="{{ asset('js/store.js') }}?v={{ filemtime(public_path('js/store.js')) }}" defer></script>
 @stack('scripts')
 </body>
 </html>

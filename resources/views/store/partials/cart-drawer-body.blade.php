@@ -21,7 +21,7 @@
     <div class="drawer-items">
         @foreach ($items as $item)
             <div class="drawer-item">
-                <a href="{{ route('product.show', $item->product) }}"><img src="{{ $item->product->image_url }}" alt="{{ $item->product->name }}"></a>
+                <a href="{{ route('product.show', $item->product) }}"><img src="{{ media_webp($item->product->image_url, 200) }}" alt="{{ $item->product->name }}" loading="lazy" decoding="async"></a>
                 <div>
                     <h4><a href="{{ route('product.show', $item->product) }}">{{ $item->product->name }}</a></h4>
                     <div class="meta">{{ $item->product->size_label }} · {{ money($item->product->price) }}</div>
