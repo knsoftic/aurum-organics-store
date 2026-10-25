@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PaymentMethod;
 use App\Payments\GatewayManager;
+use App\Services\Analytics\Tracker;
 use App\Services\CartService;
 use App\Services\OrderService;
 use Illuminate\Http\Request;
@@ -11,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 
 class CheckoutController extends Controller
 {
-    public function __construct(protected CartService $cart)
+    public function __construct(protected CartService $cart, protected Tracker $tracker)
     {
     }
 
@@ -22,6 +23,10 @@ class CheckoutController extends Controller
         }
 
         $methods = $this->availableMethods();
+        if (! session()->has('tracked_checkout')) {
+            $this->tracker->event(request(), 'begin_checkout', $this->cart->subtotal(), $this->cart->count().' item(s)');
+            session()->put('tracked_checkout', true);
+        }
 
         return view('store.checkout', [
             'items' => $this->cart->items(),
@@ -105,6 +110,10 @@ class CheckoutController extends Controller
         ]);
 
         session()->flash('order_placed', true);
+        session()->forget('tracked_checkout');
+        // The order page fires the ad-pixel Purchase event once (also after an online-payment redirect).
+        session()->put('pixel_purchase', $order->order_number);
+        $this->tracker->event($request, 'purchase', (float) $order->total, $order->order_number, $order);
 
         if ($method->isGateway() && $order->payable_now > 0) {
             $payment = $orders->createGatewayPayment($order);

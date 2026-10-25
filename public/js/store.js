@@ -77,7 +77,10 @@
     btn && btn.classList.add('is-loading');
     try {
       const data = await cartRequest(form.action, 'POST', new FormData(form));
-      if (data.ok) { openCart(); }
+      if (data.ok) {
+        openCart();
+        if (data.track && window.knTrack) window.knTrack('add_to_cart', data.track);
+      }
     } finally {
       btn && btn.classList.remove('is-loading');
     }

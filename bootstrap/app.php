@@ -19,7 +19,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'payment/*/callback',
             'payment/*/webhook',
+            't', // visitor beacon (navigator.sendBeacon cannot send the CSRF header)
         ]);
+
+        // Set by the storefront script and read by the server to link shop actions to a visit.
+        $middleware->encryptCookies(except: ['kn_sid', 'kn_vid']);
 
         $middleware->redirectGuestsTo(fn () => route('admin.login'));
     })

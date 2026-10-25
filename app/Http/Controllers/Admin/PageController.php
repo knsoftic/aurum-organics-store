@@ -52,6 +52,9 @@ class PageController extends Controller
             'title' => 'required|string|max:150',
             'slug' => ['nullable', 'string', 'max:160', Rule::unique('pages', 'slug')->ignore($page)],
             'content' => 'nullable|string|max:60000',
+            'meta_title' => 'nullable|string|max:160',
+            'meta_description' => 'nullable|string|max:500',
+            'focus_keyword' => 'nullable|string|max:120',
         ]);
 
         $data['slug'] = Str::slug($data['slug'] ?: $data['title']);

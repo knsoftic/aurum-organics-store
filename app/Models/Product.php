@@ -12,7 +12,7 @@ class Product extends Model
     protected $fillable = [
         'category_id', 'name', 'slug', 'sku', 'size_label', 'badge', 'short_description', 'description',
         'highlights', 'price', 'compare_price', 'stock', 'track_stock', 'image', 'videos', 'is_active', 'is_featured',
-        'sort_order', 'meta_title', 'meta_description',
+        'sort_order', 'meta_title', 'meta_description', 'focus_keyword',
     ];
 
     protected function casts(): array

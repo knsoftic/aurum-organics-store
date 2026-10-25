@@ -68,4 +68,23 @@
   }
   document.addEventListener('change', syncConditional);
   syncConditional();
+
+  // SEO fields: character counters + live Google preview
+  document.querySelectorAll('[data-seo-fields]').forEach((box) => {
+    const title = box.querySelector('[data-seo-title]'), desc = box.querySelector('[data-seo-description]');
+    const counter = (input, key, min, max) => {
+      const out = box.querySelector('[data-count-for="' + key + '"]');
+      const len = (input.value || input.placeholder).length;
+      out.textContent = '· ' + len + ' chars';
+      out.className = 'muted ' + (len >= min && len <= max ? 'count-ok' : len > max ? 'count-bad' : 'count-warn');
+    };
+    const update = () => {
+      box.querySelector('[data-serp-title]').textContent = (title.value || title.placeholder).slice(0, 70);
+      box.querySelector('[data-serp-desc]').textContent = (desc.value || desc.placeholder).slice(0, 165);
+      counter(title, 'title', 30, 60);
+      counter(desc, 'description', 70, 160);
+    };
+    [title, desc].forEach((el) => el.addEventListener('input', update));
+    update();
+  });
 })();

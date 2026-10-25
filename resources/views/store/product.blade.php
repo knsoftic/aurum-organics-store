@@ -4,11 +4,76 @@
 @section('meta_description', $product->meta_description ?: $product->short_description)
 @section('og_image', $product->image_url)
 
+@section('og_type', 'product')
+
 @php
     $gallery = $product->gallery;
     $lowStock = $product->track_stock && $product->stock > 0 && $product->stock <= (int) setting('low_stock_threshold', 5);
     $ratingTotal = max(1, $product->rating_count);
+    $trackItem = ['id' => $product->sku ?: $product->id, 'name' => $product->name, 'price' => (float) $product->price, 'qty' => 1];
+
+    // Product rich result: price, stock, delivery, returns and star rating in Google.
+    $currency = setting('currency_code', 'PKR');
+    $shippingFee = (float) setting('shipping_fee', 0);
+    // "2–4 working days" → 2 and 4; "7-day returns" → 7 (taken from Settings, never invented).
+    preg_match_all('/\d+/', (string) setting('delivery_time', '2–5 days'), $deliveryDays);
+    $transit = array_map('intval', array_slice($deliveryDays[0], 0, 2)) ?: [2, 5];
+    $returnDays = preg_match('/(\d+)\s*-?\s*day/i', (string) setting('return_policy_short'), $m) ? (int) $m[1] : null;
+    $productSchema = array_filter([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => $product->name,
+        'image' => array_values(array_unique($gallery)),
+        'description' => \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/', ' ', strip_tags($product->description ?: $product->short_description))), 4900),
+        'sku' => $product->sku,
+        'category' => $product->category?->name,
+        'brand' => ['@type' => 'Brand', 'name' => setting('store_name')],
+        'offers' => [
+            '@type' => 'Offer',
+            'url' => route('product.show', $product),
+            'priceCurrency' => $currency,
+            'price' => number_format((float) $product->price, 2, '.', ''),
+            'availability' => $product->isInStock() ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+            'itemCondition' => 'https://schema.org/NewCondition',
+            'seller' => ['@id' => url('/').'#organization'],
+            'shippingDetails' => [
+                '@type' => 'OfferShippingDetails',
+                'shippingRate' => ['@type' => 'MonetaryAmount', 'value' => $shippingFee, 'currency' => $currency],
+                'shippingDestination' => ['@type' => 'DefinedRegion', 'addressCountry' => 'PK'],
+                'deliveryTime' => ['@type' => 'ShippingDeliveryTime',
+                    'handlingTime' => ['@type' => 'QuantitativeValue', 'minValue' => 0, 'maxValue' => 1, 'unitCode' => 'DAY'],
+                    'transitTime' => ['@type' => 'QuantitativeValue', 'minValue' => $transit[0], 'maxValue' => $transit[1] ?? $transit[0], 'unitCode' => 'DAY']],
+            ],
+        ] + ($returnDays ? ['hasMerchantReturnPolicy' => [
+            '@type' => 'MerchantReturnPolicy',
+            'applicableCountry' => 'PK',
+            'returnPolicyCategory' => 'https://schema.org/MerchantReturnFiniteReturnWindow',
+            'merchantReturnDays' => $returnDays,
+        ]] : []),
+        'aggregateRating' => $product->rating_count > 0 ? ['@type' => 'AggregateRating', 'ratingValue' => $product->rating, 'reviewCount' => $product->rating_count, 'bestRating' => 5] : null,
+        'review' => $reviews->take(5)->map(fn ($r) => [
+            '@type' => 'Review',
+            'author' => ['@type' => 'Person', 'name' => $r->name],
+            'datePublished' => $r->created_at->toDateString(),
+            'reviewRating' => ['@type' => 'Rating', 'ratingValue' => $r->rating, 'bestRating' => 5],
+            'reviewBody' => \Illuminate\Support\Str::limit($r->comment, 500),
+        ])->values()->all() ?: null,
+    ]);
+    $breadcrumbs = ['@context' => 'https://schema.org', '@type' => 'BreadcrumbList', 'itemListElement' => array_values(array_filter([
+        ['@type' => 'ListItem', 'position' => 1, 'name' => 'Home', 'item' => route('home')],
+        $product->category ? ['@type' => 'ListItem', 'position' => 2, 'name' => $product->category->name, 'item' => route('shop', ['category' => $product->category->slug])] : null,
+        ['@type' => 'ListItem', 'position' => $product->category ? 3 : 2, 'name' => $product->name, 'item' => route('product.show', $product)],
+    ]))];
 @endphp
+
+@push('head')
+<script type="application/ld+json">{!! json_encode($productSchema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) !!}</script>
+<script type="application/ld+json">{!! json_encode($breadcrumbs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) !!}</script>
+@endpush
+
+@push('scripts')
+<script>window.knTrack && knTrack('view_item', { value: {{ (float) $product->price }}, items: [@json($trackItem)] });</script>
+@endpush
 
 @section('content')
 <div class="container">
@@ -25,7 +90,7 @@
                 <div class="gallery-thumbs">
                     @foreach ($gallery as $i => $url)
                         <button type="button" class="{{ $i === 0 ? 'active' : '' }}" data-gallery-thumb data-src="{{ $url }}" aria-label="Image {{ $i + 1 }}">
-                            <img src="{{ $url }}" alt="">
+                            <img src="{{ $url }}" alt="{{ $product->name }} — photo {{ $i + 1 }}" loading="lazy">
                         </button>
                     @endforeach
                 </div>

@@ -200,6 +200,15 @@
 @endsection
 
 @push('scripts')
+@php
+    $pixelItems = $items->map(fn ($i) => ['id' => $i->product->sku ?: $i->product->id, 'name' => $i->product->name, 'price' => (float) $i->product->price, 'qty' => $i->qty])->values();
+@endphp
+<script>
+    if (window.knTrack) {
+        @if (session('pixel_add_to_cart'))knTrack('add_to_cart', @json(session('pixel_add_to_cart')));@endif
+        knTrack('begin_checkout', { value: {{ (float) $totals['subtotal'] }}, items: @json($pixelItems) });
+    }
+</script>
 <script>
 (function () {
     const totals = @json($methodTotals);

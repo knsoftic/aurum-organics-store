@@ -7,7 +7,9 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\SeoController;
 use App\Http\Controllers\ShopController;
+use App\Http\Controllers\TrackController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -47,6 +49,12 @@ Route::post('/payment/{method:code}/webhook', [PaymentController::class, 'webhoo
 Route::get('/contact', [PageController::class, 'contact'])->name('contact');
 Route::post('/contact', [PageController::class, 'sendContact'])->name('contact.send')->middleware('throttle:5,10');
 Route::get('/pages/{page:slug}', [PageController::class, 'show'])->name('page.show');
+
+// SEO files and the visitor counter beacon
+Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('seo.sitemap');
+Route::get('/robots.txt', [SeoController::class, 'robots'])->name('seo.robots');
+Route::get('/ads.txt', [SeoController::class, 'adsTxt'])->name('seo.ads');
+Route::post('/t', [TrackController::class, 'collect'])->name('track.collect')->middleware('throttle:120,1');
 
 /*
 |--------------------------------------------------------------------------
@@ -109,6 +117,30 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::delete('{adProject}/voice', 'voiceDelete')->name('voice.delete');
             Route::post('{adProject}/renders/chunk', 'renderChunk')->name('renders.chunk');
             Route::delete('renders/{adRender}', 'destroyRender')->name('renders.destroy');
+        });
+
+        Route::prefix('marketing')->name('marketing.')->group(function () {
+            Route::get('traffic', [Admin\TrafficController::class, 'index'])->name('traffic');
+            Route::get('traffic/log', [Admin\TrafficController::class, 'log'])->name('traffic.log');
+            Route::get('traffic/log/{visit}', [Admin\TrafficController::class, 'visit'])->name('traffic.visit');
+            Route::get('system-log', [Admin\TrafficController::class, 'systemLog'])->name('system-log');
+
+            Route::controller(Admin\KeywordController::class)->prefix('keywords')->name('keywords.')->group(function () {
+                Route::get('/', 'index')->name('index');
+                Route::post('/', 'store')->name('store');
+                Route::post('sync', 'sync')->name('sync');
+                Route::post('suggestions', 'addSuggestions')->name('suggestions');
+                Route::put('{keyword}', 'update')->name('update');
+                Route::delete('{keyword}', 'destroy')->name('destroy');
+                Route::post('{keyword}/rank', 'rank')->name('rank');
+            });
+
+            Route::get('seo', [Admin\SeoController::class, 'index'])->name('seo');
+            Route::post('seo/checklist', [Admin\SeoController::class, 'checklist'])->name('seo.checklist');
+
+            Route::get('tracking', [Admin\TrackingController::class, 'edit'])->name('tracking');
+            Route::put('tracking', [Admin\TrackingController::class, 'update'])->name('tracking.update');
+            Route::post('tracking/geoip', [Admin\TrackingController::class, 'downloadGeoip'])->name('tracking.geoip');
         });
 
         Route::get('settings', [Admin\SettingController::class, 'edit'])->name('settings.edit');

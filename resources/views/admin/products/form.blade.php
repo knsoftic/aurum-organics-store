@@ -83,8 +83,7 @@
             <div class="card">
                 <div class="card-head"><h3>SEO</h3></div>
                 <div class="card-body form-grid">
-                    <div class="field full"><label>Meta title</label><input class="input" name="meta_title" value="{{ old('meta_title', $product->meta_title) }}" maxlength="160"></div>
-                    <div class="field full"><label>Meta description</label><textarea class="textarea" name="meta_description" style="min-height:70px" maxlength="500">{{ old('meta_description', $product->meta_description) }}</textarea></div>
+                    @include('admin.partials.seo-fields', ['model' => $product, 'url' => $product->exists ? route('product.show', $product) : url('/product/new'), 'fallbackTitle' => ($product->name ?: 'Product name').' — '.setting('store_name'), 'fallbackDescription' => $product->short_description ?: 'Short description of the product…'])
                 </div>
             </div>
         </div>

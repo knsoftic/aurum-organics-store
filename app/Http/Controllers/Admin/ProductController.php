@@ -107,6 +107,7 @@ class ProductController extends Controller
             'sort_order' => 'nullable|integer|min:0|max:9999',
             'meta_title' => 'nullable|string|max:160',
             'meta_description' => 'nullable|string|max:500',
+            'focus_keyword' => 'nullable|string|max:120',
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
             'gallery.*' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
             'new_videos.*' => 'nullable|file|mimetypes:video/mp4,video/webm,video/quicktime|max:51200',

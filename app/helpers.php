@@ -78,3 +78,26 @@ if (! function_exists('whatsapp_link')) {
         return 'https://wa.me/'.$number.($message ? '?text='.rawurlencode($message) : '');
     }
 }
+
+if (! function_exists('country_flag')) {
+    /** Emoji flag for a two-letter country code (empty when unknown). */
+    function country_flag(?string $code): string
+    {
+        if (! $code || ! preg_match('/^[A-Z]{2}$/', $code = strtoupper($code))) {
+            return '';
+        }
+
+        return mb_chr(0x1F1E6 + ord($code[0]) - 65).mb_chr(0x1F1E6 + ord($code[1]) - 65);
+    }
+}
+
+if (! function_exists('country_name')) {
+    function country_name(?string $code): string
+    {
+        if (! $code) {
+            return 'Unknown';
+        }
+
+        return config('countries.'.strtoupper($code), strtoupper($code));
+    }
+}

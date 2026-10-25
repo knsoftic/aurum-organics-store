@@ -33,6 +33,7 @@ class PageController extends Controller
         ]);
 
         ContactMessage::create($data);
+        app(\App\Services\Analytics\Tracker::class)->event($request, 'contact', null, $data['subject'] ?? null);
 
         return back()->with('success', 'Thank you for reaching out — we will get back to you shortly.');
     }

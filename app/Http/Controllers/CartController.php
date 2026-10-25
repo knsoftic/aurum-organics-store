@@ -3,12 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Services\Analytics\Tracker;
 use App\Services\CartService;
 use Illuminate\Http\Request;
 
 class CartController extends Controller
 {
-    public function __construct(protected CartService $cart)
+    public function __construct(protected CartService $cart, protected Tracker $tracker)
     {
     }
 
@@ -31,14 +32,18 @@ class CartController extends Controller
         }
 
         $this->cart->add($product, $qty);
+        $this->tracker->event($request, 'add_to_cart', $product->price * $qty, $product->name);
+        // Ad pixels fire in the browser: right away for AJAX adds, on the checkout page for Buy It Now.
+        $track = ['value' => (float) $product->price * $qty, 'items' => [['id' => $product->sku ?: $product->id, 'name' => $product->name, 'price' => (float) $product->price, 'qty' => $qty]]];
 
         if ($request->boolean('buy_now')) {
+            session()->flash('pixel_add_to_cart', $track);
             return $request->wantsJson()
                 ? response()->json(['redirect' => route('checkout')])
                 : redirect()->route('checkout');
         }
 
-        return $this->respond($request, $product->name.' added to your bag.');
+        return $this->respond($request, $product->name.' added to your bag.', true, ['track' => $track]);
     }
 
     public function update(Request $request, Product $product)
@@ -74,10 +79,10 @@ class CartController extends Controller
         return back()->with('success', 'Coupon removed.');
     }
 
-    protected function respond(Request $request, string $message, bool $ok = true)
+    protected function respond(Request $request, string $message, bool $ok = true, array $extra = [])
     {
         if ($request->wantsJson()) {
-            return response()->json([
+            return response()->json($extra + [
                 'ok' => $ok,
                 'message' => $message,
                 'count' => $this->cart->count(),

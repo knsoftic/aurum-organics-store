@@ -176,6 +176,13 @@
 @endsection
 
 @push('scripts')
+@if (session('pixel_purchase') === $order->order_number)
+    @php
+        session()->forget('pixel_purchase');
+        $pixelItems = $order->items->map(fn ($i) => ['id' => $i->sku ?: $i->product_id, 'name' => $i->product_name, 'price' => (float) $i->price, 'qty' => $i->quantity])->values();
+    @endphp
+    <script>window.knTrack && knTrack('purchase', { value: {{ (float) $order->total }}, orderId: @json($order->order_number), eventId: @json('order-'.$order->order_number), items: @json($pixelItems) });</script>
+@endif
 <script>
 document.addEventListener('change', (e) => {
     if (e.target.name === 'payment_method_id') {

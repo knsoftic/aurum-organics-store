@@ -2,6 +2,11 @@
     $storeName = setting('store_name', config('app.name'));
     $pageTitle = trim($__env->yieldContent('title'));
     $metaDescription = trim($__env->yieldContent('meta_description')) ?: setting('meta_description');
+    $fullTitle = $pageTitle ? (str_contains($pageTitle, $storeName) ? $pageTitle : $pageTitle.' — '.$storeName) : setting('meta_title', $storeName);
+    $canonical = trim($__env->yieldContent('canonical')) ?: url()->current();
+    // Bag, checkout and order pages are private: keep them out of Google.
+    $noindex = request()->routeIs('cart.*', 'checkout', 'checkout.*', 'order.*', 'track', 'track.*', 'payment.*') || trim($__env->yieldContent('noindex')) !== '';
+    $ogImage = trim($__env->yieldContent('og_image')) ?: (setting('hero_image') ? media_url(setting('hero_image')) : (setting('logo') ? media_url(setting('logo')) : null));
 @endphp
 <!DOCTYPE html>
 <html lang="en" data-theme="{{ setting('theme', 'emerald') }}">
@@ -10,21 +15,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <script>document.documentElement.classList.add('js')</script>
-    <title>{{ $pageTitle ? (str_contains($pageTitle, $storeName) ? $pageTitle : $pageTitle.' — '.$storeName) : setting('meta_title', $storeName) }}</title>
+    <title>{{ $fullTitle }}</title>
     <meta name="description" content="{{ $metaDescription }}">
-    <meta property="og:title" content="{{ $pageTitle ?: setting('meta_title', $storeName) }}">
+    <meta name="robots" content="{{ $noindex ? 'noindex, follow' : 'index, follow, max-image-preview:large' }}">
+    <link rel="canonical" href="{{ $canonical }}">
+    <meta property="og:site_name" content="{{ $storeName }}">
+    <meta property="og:title" content="{{ $fullTitle }}">
     <meta property="og:description" content="{{ $metaDescription }}">
-    <meta property="og:type" content="website">
-    @hasSection('og_image')<meta property="og:image" content="@yield('og_image')">@endif
+    <meta property="og:type" content="@yield('og_type', 'website')">
+    <meta property="og:url" content="{{ $canonical }}">
+    <meta property="og:locale" content="en_PK">
+    @if ($ogImage)<meta property="og:image" content="{{ $ogImage }}">
+    @endif
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ $fullTitle }}">
+    <meta name="twitter:description" content="{{ $metaDescription }}">
+    @if ($ogImage)<meta name="twitter:image" content="{{ $ogImage }}">
+    @endif
     <link rel="icon" href="{{ setting('favicon') ? media_url(setting('favicon')) : asset('favicon.ico') }}">
     <meta name="theme-color" content="{{ ['lavender' => '#3b1a6b', 'noir' => '#161616', 'ivory' => '#4b4537', 'rose' => '#4a2a2f'][setting('theme')] ?? '#1f3a2e' }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('css/store.css') }}?v={{ filemtime(public_path('css/store.css')) }}">
+    @include('store.partials.schema-site')
     @stack('head')
+    @include('store.partials.tracking-head')
 </head>
 <body class="@yield('body_class')">
+@include('store.partials.tracking-body')
 
 @if (setting('announcement_active') && setting('announcement_text'))
     <div class="announce">{{ setting('announcement_text') }}</div>
