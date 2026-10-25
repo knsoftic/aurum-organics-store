@@ -17,6 +17,34 @@
         <button type="button" data-tab="storefront">Storefront</button>
         <button type="button" data-tab="checkout">Checkout &amp; Delivery</button>
         <button type="button" data-tab="seo">SEO &amp; Social</button>
+        <button type="button" data-tab="integrations">Integrations</button>
+    </div>
+
+    {{-- INTEGRATIONS --}}
+    <div class="tab-panel" data-tab-panel="integrations">
+        <div class="grid grid-2">
+            <div class="card">
+                <div class="card-head"><h3>Urdu voice for Ad Studio (Azure AI Speech)</h3></div>
+                <div class="card-body form-grid">
+                    <div class="field full"><label>Voice provider</label>
+                        <select class="select" name="tts_provider">
+                            <option value="none" @selected($v('tts_provider', 'none') === 'none')>None — record your own voice or upload audio</option>
+                            <option value="azure" @selected($v('tts_provider') === 'azure')>Microsoft Azure AI Speech (realistic Urdu voices)</option>
+                        </select>
+                    </div>
+                    <div class="field"><label>Speech key</label>
+                        <input class="input" type="password" name="azure_speech_key" autocomplete="off" placeholder="{{ setting('azure_speech_key') ? '•••••••• saved — leave blank to keep' : 'Paste KEY 1 from Azure' }}">
+                        @if (setting('azure_speech_key'))<label class="switch" style="margin-top:8px;font-weight:400"><input type="checkbox" name="remove_azure_speech_key" value="1"><span class="track"></span> Remove saved key</label>@endif
+                    </div>
+                    <div class="field"><label>Region</label><input class="input" name="azure_speech_region" value="{{ $v('azure_speech_region') }}" placeholder="e.g. eastus, centralindia, uaenorth"></div>
+                    <div class="field full hint" style="line-height:1.6">
+                        Free tier: 500,000 characters / month (one ad ≈ 400 characters).
+                        Azure portal → Create resource → <strong>Speech</strong> → pricing tier <strong>Free F0</strong> → Keys and Endpoint → copy <strong>KEY 1</strong> and <strong>Location/Region</strong>.
+                        The key is stored encrypted.
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     {{-- GENERAL --}}

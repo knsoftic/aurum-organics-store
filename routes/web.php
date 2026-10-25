@@ -94,6 +94,21 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('pages', Admin\PageController::class)->except('show');
         Route::resource('messages', Admin\MessageController::class)->only(['index', 'show', 'destroy']);
 
+        Route::controller(Admin\AdStudioController::class)->prefix('ad-studio')->name('ad-studio.')->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::get('{adProject}', 'show')->name('show');
+            Route::put('{adProject}', 'update')->name('update');
+            Route::delete('{adProject}', 'destroy')->name('destroy');
+            Route::post('{adProject}/regenerate', 'regenerate')->name('regenerate');
+            Route::post('{adProject}/media', 'uploadMedia')->name('media');
+            Route::post('{adProject}/tts', 'tts')->name('tts');
+            Route::post('{adProject}/voice', 'voiceUpload')->name('voice');
+            Route::delete('{adProject}/voice', 'voiceDelete')->name('voice.delete');
+            Route::post('{adProject}/renders/chunk', 'renderChunk')->name('renders.chunk');
+            Route::delete('renders/{adRender}', 'destroyRender')->name('renders.destroy');
+        });
+
         Route::get('settings', [Admin\SettingController::class, 'edit'])->name('settings.edit');
         Route::put('settings', [Admin\SettingController::class, 'update'])->name('settings.update');
     });

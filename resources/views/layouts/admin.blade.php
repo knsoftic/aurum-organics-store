@@ -10,6 +10,7 @@
         ['Sales', null],
         ['Payment Methods', 'admin.payment-methods.index', 'card', null, 'admin.payment-methods.*'],
         ['Coupons', 'admin.coupons.index', 'tag', null, 'admin.coupons.*'],
+        ['Ad Studio', 'admin.ad-studio.index', 'play', null, 'admin.ad-studio.*'],
         ['Content', null],
         ['Pages', 'admin.pages.index', 'file', null, 'admin.pages.*'],
         ['Messages', 'admin.messages.index', 'inbox', $adminBadges['messages'], 'admin.messages.*'],

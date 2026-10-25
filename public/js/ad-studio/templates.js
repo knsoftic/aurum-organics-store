@@ -1,0 +1,419 @@
+/* Ad Studio — data-driven ad templates.
+   AdTemplates.build(format, spec) -> composition { w, h, duration, scenes, cues, voices }
+   spec = { brand: {name, mark}, t: <config.text>, media: {hero, wide, square, thumb, clipOpen, clipHowto, clipWide}, voiceDur: {key: seconds} }
+   Scenes stretch to fit the voice-over line recorded/generated for them. */
+(function () {
+  'use strict';
+  const E = window.AdEngine;
+  const { C, F, clamp, lerp, ease, pr, txt, reveal, measure, card, glow, pill, checkIcon, crossIcon, logo, bgLight, bgDark, sweepLight, rrPath, archPath, cover } = E;
+  const LEAVES = ['#6b4a2b', '#7fae3c', '#3f8f4a', '#e0393e', '#5f8f7a', '#c99a3b'];
+
+  function popScale(ctx, cx, cy, p, from = 0.6) {
+    const s = lerp(from, 1, ease.back(clamp(p)));
+    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+  }
+
+  function chipRow(ctx, labels, cx, y, h, fs, lt, start, step) {
+    labels = (labels || []).filter(Boolean); if (!labels.length) return;
+    const style = { f: F.body, w: 600, s: fs, ls: 1 };
+    const widths = labels.map((l) => measure(ctx, l, style) + h * 0.9);
+    const gap = h * 0.25;
+    let x = cx - (widths.reduce((a, b) => a + b, 0) + gap * (labels.length - 1)) / 2;
+    labels.forEach((label, i) => {
+      const p = pr(lt, start + i * step, 0.5);
+      if (p > 0) {
+        ctx.save(); ctx.globalAlpha *= clamp(p * 2);
+        popScale(ctx, x + widths[i] / 2, y + h / 2, p);
+        ctx.shadowColor = 'rgba(0,0,0,.16)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 8;
+        pill(ctx, x, y, widths[i], h, '#ffffff');
+        ctx.shadowColor = 'transparent';
+        txt(ctx, label, x + widths[i] / 2, y + h / 2 + fs * 0.36, { ...style, c: C.purple });
+        ctx.restore();
+      }
+      x += widths[i] + gap;
+    });
+  }
+
+  function tagCloud(ctx, labels, x0, maxW, y0, h, fs, lt, start, step) {
+    labels = (labels || []).filter(Boolean);
+    const style = { f: F.body, w: 600, s: fs, ls: 1 };
+    const gap = h * 0.22;
+    const rows = [[]]; let rowW = 0;
+    labels.forEach((l) => {
+      const w = measure(ctx, l, style) + h * 0.8;
+      if (rowW + w > maxW && rows[rows.length - 1].length) { rows.push([]); rowW = 0; }
+      rows[rows.length - 1].push([l, w]); rowW += w + gap;
+    });
+    let i = 0;
+    rows.forEach((row, r) => {
+      const total = row.reduce((a, [, w]) => a + w, 0) + gap * (row.length - 1);
+      let x = x0 + (maxW - total) / 2;
+      const y = y0 + r * (h + gap);
+      row.forEach(([l, w]) => {
+        const p = pr(lt, start + i * step, 0.45);
+        if (p > 0) {
+          ctx.save(); ctx.globalAlpha *= clamp(p * 2);
+          popScale(ctx, x + w / 2, y + h / 2, p, 0.4);
+          pill(ctx, x, y, w, h, 'rgba(255,255,255,.1)', 'rgba(255,255,255,.45)');
+          txt(ctx, l, x + w / 2, y + h / 2 + fs * 0.36, { ...style, c: '#fff' });
+          ctx.restore();
+        }
+        x += w + gap; i++;
+      });
+    });
+  }
+
+  function benefitChip(ctx, label, x, y, w, h, p) {
+    if (p <= 0 || !label) return;
+    ctx.save(); ctx.globalAlpha *= clamp(p * 2);
+    popScale(ctx, x + w / 2, y + h / 2, p, 0.7);
+    ctx.shadowColor = 'rgba(0,0,0,.18)'; ctx.shadowBlur = 34; ctx.shadowOffsetY = 12;
+    pill(ctx, x, y, w, h, '#ffffff');
+    ctx.shadowColor = 'transparent';
+    checkIcon(ctx, x + h * 0.55, y + h / 2, h * 0.31, C.purple);
+    txt(ctx, label, x + h * 1.08, y + h / 2 + h * 0.16, { f: F.sans, w: 700, s: h * 0.44, c: C.ink, a: 'left', max: w - h * 1.3 });
+    ctx.restore();
+  }
+
+  function priceBadge(ctx, t, cx, cy, r, p, time) {
+    if (p <= 0 || !t.price) return;
+    ctx.save(); ctx.globalAlpha *= clamp(p * 2);
+    popScale(ctx, cx, cy, p, 0.3);
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(time * 0.5);
+    ctx.setLineDash([r * 0.07, r * 0.09]); ctx.lineWidth = r * 0.025; ctx.strokeStyle = C.violet;
+    ctx.beginPath(); ctx.arc(0, 0, r * 1.14, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    const g = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+    g.addColorStop(0, C.royal); g.addColorStop(1, C.deep);
+    ctx.shadowColor = 'rgba(0,0,0,.4)'; ctx.shadowBlur = r * 0.4; ctx.shadowOffsetY = r * 0.12;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.lineWidth = r * 0.02; ctx.strokeStyle = 'rgba(255,255,255,.35)';
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.88, 0, Math.PI * 2); ctx.stroke();
+    txt(ctx, 'ONLY', cx, cy - r * 0.4, { f: F.body, w: 600, s: r * 0.2, ls: r * 0.04, c: C.lav });
+    txt(ctx, t.currency || 'Rs.', cx, cy - r * 0.08, { f: F.sans, w: 800, s: r * 0.27, c: '#fff' });
+    txt(ctx, t.price, cx, cy + r * 0.46, { f: F.sans, w: 900, s: r * 0.6, c: '#fff', max: r * 1.6 });
+    ctx.restore();
+  }
+
+  function ctaButton(ctx, x, y, w, h, p, lt, label) {
+    if (p <= 0) return;
+    label = label || 'SHOP NOW';
+    const pulse = lt > 0 ? 1 + 0.03 * Math.sin(lt * 6) : 1;
+    ctx.save(); ctx.globalAlpha *= clamp(p * 2);
+    popScale(ctx, x + w / 2, y + h / 2, p, 0.6);
+    ctx.translate(x + w / 2, y + h / 2); ctx.scale(pulse, pulse); ctx.translate(-(x + w / 2), -(y + h / 2));
+    const g = ctx.createLinearGradient(x, y, x + w, y + h);
+    g.addColorStop(0, C.royal); g.addColorStop(1, C.purple);
+    ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 16;
+    pill(ctx, x, y, w, h, g);
+    ctx.shadowColor = 'transparent';
+    ctx.save(); rrPath(ctx, x, y, w, h, h / 2); ctx.clip(); sweepLight(ctx, x, y, w, h, ((lt + 10) % 1.8) / 1.1); ctx.restore();
+    const fs = h * 0.4, style = { f: F.sans, w: 800, s: fs, ls: fs * 0.08, c: '#fff' };
+    const tw = Math.min(measure(ctx, label, style), w - h * 1.4);
+    const ax = x + w / 2 + tw / 2 + fs * 0.2, nudge = Math.sin(lt * 6) * fs * 0.12;
+    txt(ctx, label, x + w / 2 - fs * 0.45, y + h / 2 + fs * 0.36, { ...style, max: w - h * 1.4 });
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = fs * 0.12; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(ax - fs * 0.35 + nudge, y + h / 2); ctx.lineTo(ax + fs * 0.3 + nudge, y + h / 2);
+    ctx.moveTo(ax + nudge, y + h / 2 - fs * 0.32); ctx.lineTo(ax + fs * 0.32 + nudge, y + h / 2); ctx.lineTo(ax + nudge, y + h / 2 + fs * 0.32); ctx.stroke();
+    ctx.restore();
+  }
+
+  function stamp(ctx, t, cx, cy, r, p) {
+    if (p <= 0) return;
+    ctx.save(); ctx.globalAlpha *= clamp(p * 2);
+    ctx.translate(cx, cy); ctx.rotate(-0.14); const s = lerp(1.7, 1, ease.out(p)); ctx.scale(s, s);
+    ctx.lineWidth = r * 0.04; ctx.strokeStyle = C.lav;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([r * 0.06, r * 0.06]); ctx.lineWidth = r * 0.02;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.84, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    txt(ctx, t.stamp1 || '100%', 0, -r * 0.02, { f: F.sans, w: 900, s: r * 0.46, c: '#fff', max: r * 1.5 });
+    txt(ctx, t.stamp2 || 'NATURAL', 0, r * 0.32, { f: F.sans, w: 800, s: r * 0.2, ls: r * 0.05, c: C.lav, max: r * 1.5 });
+    ctx.restore();
+  }
+
+  function leafDot(ctx, cx, cy, r, color) {
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(-0.7); ctx.fillStyle = 'rgba(255,255,255,.92)';
+    ctx.beginPath(); ctx.ellipse(0, 0, r * 0.55, r * 0.26, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = color; ctx.lineWidth = r * 0.07; ctx.beginPath(); ctx.moveTo(-r * 0.5, 0); ctx.lineTo(r * 0.5, 0); ctx.stroke();
+    ctx.restore();
+  }
+
+  function grade(ctx, W, H) {
+    ctx.fillStyle = C.deep; ctx.globalAlpha = 0.16; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+    let g = ctx.createLinearGradient(0, H * 0.42, 0, H);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, C.ink);
+    ctx.save(); ctx.globalAlpha = 0.92; ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore();
+    g = ctx.createLinearGradient(0, 0, 0, H * 0.2);
+    g.addColorStop(0, C.ink); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.save(); ctx.globalAlpha = 0.55; ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore();
+  }
+
+  const lines = (arr) => (arr || []).filter((s) => s && String(s).trim());
+
+  // ===================== 9:16 (1080x1920) =====================
+  function portraitScenes(S) {
+    const t = S.t, M = S.media, B = S.brand;
+    return {
+      hook(ctx, k) {
+        const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        bgLight(ctx, W, k.H, k.t);
+        logo(ctx, B, W / 2, 250, 92, C.purple, ease.out(a(0, 0.5)));
+        const hook = lines(t.hook).slice(0, 3), top = 700 + (3 - hook.length) * 70;
+        hook.forEach((s, i) => reveal(ctx, s, W / 2, top + i * 142, { f: F.sans, w: 900, s: 120, c: C.purple, ls: 2, max: 930 }, a(0.12 + i * 0.14, 0.7)));
+        const ay = top + hook.length * 142 + 70;
+        reveal(ctx, t.hookAccent, W / 2, ay, { f: F.serif, w: 600, it: true, s: 210, c: C.violet, max: 960 }, a(0.6, 0.8));
+        const uw = 560 * ease.out(a(1.0, 0.6));
+        if (uw > 1 && t.hookAccent) { ctx.strokeStyle = C.violet; ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(W / 2 - uw / 2, ay + 54); ctx.lineTo(W / 2 + uw / 2, ay + 54); ctx.stroke(); }
+        txt(ctx, t.hookUrdu, W / 2, ay + 204, { f: F.urdu, w: 600, s: 56, c: C.deep, alpha: ease.out(a(1.2, 0.6)), dir: 'rtl', max: 940 });
+        const pp = ease.out(a(0.9, 0.7));
+        if (pp > 0 && M.thumb) {
+          const r = 150, cx = W / 2, cy = 1640 + (1 - pp) * 120 + Math.sin(lt * 2.2) * 8;
+          ctx.save(); ctx.globalAlpha *= pp;
+          ctx.shadowColor = 'rgba(0,0,0,.3)'; ctx.shadowBlur = 50; ctx.shadowOffsetY = 20;
+          ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill(); ctx.shadowColor = 'transparent';
+          ctx.beginPath(); ctx.arc(cx, cy, r - 8, 0, Math.PI * 2); ctx.clip();
+          cover(ctx, M.thumb.el, cx - r, cy - r, r * 2, r * 2, 1.25, M.thumb.fx, M.thumb.fy);
+          ctx.restore();
+        }
+      },
+      reveal(ctx, k) {
+        const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        bgLight(ctx, W, k.H, k.t);
+        glow(ctx, W / 2, 1110, 640, 'rgba(255,255,255,1)', 0.9);
+        txt(ctx, t.intro, W / 2, 290, { f: F.body, w: 600, s: 38, ls: 14, c: C.violet, alpha: ease.out(a(0, 0.5)) });
+        reveal(ctx, t.productLine1, W / 2, 455, { f: F.serif, w: 600, it: true, s: 170, c: C.purple, max: 960 }, a(0.1, 0.7));
+        reveal(ctx, t.productLine2, W / 2, 580, { f: F.sans, w: 900, s: 112, ls: 8, c: C.purple, max: 960 }, a(0.25, 0.7));
+        const ap = ease.out(a(0.2, 0.9)), x = 170, y = 660 + (1 - ap) * 160, w = 740, h = 925;
+        ctx.save(); ctx.globalAlpha *= ap; ctx.strokeStyle = C.violet; ctx.lineWidth = 3; archPath(ctx, x - 24, y - 24, w, h); ctx.stroke(); ctx.restore();
+        card(ctx, M.hero, x, y, w, h, { shape: 'arch', zoom: lerp(1.18, 1, ease.out(pr(lt, 0.2, 2.6))), alpha: ap, sweep: pr(lt, 1.4, 1.0) });
+        chipRow(ctx, t.introChips, W / 2, 1548, 76, 32, lt, 1.2, 0.15);
+      },
+      benefits(ctx, k) {
+        const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        bgLight(ctx, W, k.H, k.t);
+        const ap = ease.out(a(0, 0.7));
+        card(ctx, M.wide, 90, 230 + (1 - ap) * 80, 900, 675, { r: 40, zoom: lerp(1.02, 1.12, pr(lt, 0, k.dur)), alpha: ap });
+        reveal(ctx, t.benefitsTitle, W / 2, 1030, { f: F.serif, w: 600, it: true, s: 104, c: C.purple, max: 940 }, a(0.3, 0.7));
+        lines(t.benefits).slice(0, 4).forEach((b, i) => benefitChip(ctx, b, 130, 1092 + i * 120, 820, 98, a(0.65 + i * 0.42, 0.55)));
+      },
+      ingredients(ctx, k) {
+        const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        bgDark(ctx, W, k.H, k.t);
+        if (t.countNumber) {
+          const n = Math.round(t.countNumber * ease.out(pr(lt, 0.1, 0.9)));
+          ctx.save(); popScale(ctx, W / 2, 660, a(0, 0.6), 0.7); ctx.globalAlpha *= clamp(a(0, 0.3) * 2);
+          txt(ctx, n + '+', W / 2, 790, { f: F.sans, w: 900, s: 380, c: '#fff', shadow: 'rgba(0,0,0,.3)' });
+          ctx.restore();
+        }
+        reveal(ctx, t.countLabel, W / 2, 905, { f: F.sans, w: 800, s: 62, ls: 4, c: C.lav, max: 920 }, a(0.4, 0.7));
+        txt(ctx, t.countUrdu, W / 2, 1012, { f: F.urdu, w: 600, s: 48, c: '#fff', alpha: 0.92 * ease.out(a(0.65, 0.6)), dir: 'rtl', max: 940 });
+        tagCloud(ctx, t.tags, 90, 900, 1090, 80, 38, lt, 0.8, 0.06);
+        txt(ctx, t.freeFromLine, W / 2, 1540, { f: F.body, w: 600, s: 30, ls: 3, c: C.lav, alpha: ease.out(a(1.7, 0.5)), max: 940 });
+      },
+      offer(ctx, k) {
+        const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        bgLight(ctx, W, k.H, k.t);
+        logo(ctx, B, W / 2, 200, 84, C.purple, ease.out(a(0, 0.5)));
+        const ap = ease.out(a(0, 0.7));
+        card(ctx, M.square, 250, 290 + (1 - ap) * 70, 640, 630, { r: 44, zoom: lerp(1.14, 1, ease.out(pr(lt, 0, 1.6))), alpha: ap, sweep: pr(lt, 1.7, 1.0) });
+        priceBadge(ctx, t, 255, 860, 150, a(0.35, 0.6), k.t);
+        reveal(ctx, t.offerTitle, W / 2, 1075, { f: F.sans, w: 900, s: 96, ls: 2, c: C.purple, max: 920 }, a(0.6, 0.6));
+        reveal(ctx, t.offerSub, W / 2, 1160, { f: F.serif, w: 600, it: true, s: 78, c: C.violet, max: 920 }, a(0.75, 0.6));
+        txt(ctx, t.offerUrdu, W / 2, 1250, { f: F.urdu, w: 600, s: 46, c: C.deep, alpha: ease.out(a(0.95, 0.6)), dir: 'rtl', max: 940 });
+        chipRow(ctx, t.offerChips, W / 2, 1288, 70, 30, lt, 1.1, 0.1);
+        ctaButton(ctx, 190, 1392, 700, 118, a(1.35, 0.6), lt - 1.9, t.cta);
+        txt(ctx, t.url, W / 2, 1580, { f: F.body, w: 600, s: 48, ls: 2, c: C.purple, alpha: ease.out(a(1.6, 0.6)), max: 940 });
+      },
+      meet(ctx, k) {
+        const { W, H, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        cover(ctx, M.clipOpen.el, 0, 0, W, H, lerp(1.1, 1.0, ease.out(pr(lt, 0, k.dur))), M.clipOpen.fx, M.clipOpen.fy);
+        grade(ctx, W, H);
+        logo(ctx, B, W / 2, 190, 84, '#fff', ease.out(a(0, 0.5)));
+        reveal(ctx, t.meetTop, W / 2, 1190, { f: F.sans, w: 800, s: 66, ls: 12, c: '#fff', max: 940 }, a(0.3, 0.6));
+        reveal(ctx, t.meetBig, W / 2, 1425, { f: F.serif, w: 600, it: true, s: 240, c: '#fff', max: 960 }, a(0.45, 0.8));
+        txt(ctx, t.meetSub, W / 2, 1515, { f: F.body, w: 500, s: 38, c: C.lav, alpha: ease.out(a(0.95, 0.6)), max: 940 });
+      },
+      inside(ctx, k) {
+        const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        bgLight(ctx, W, k.H, k.t);
+        reveal(ctx, t.insideTitle1, W / 2, 300, { f: F.sans, w: 900, s: 104, ls: 4, c: C.purple, max: 940 }, a(0, 0.6));
+        reveal(ctx, t.insideTitle2, W / 2, 445, { f: F.serif, w: 600, it: true, s: 160, c: C.violet, max: 940 }, a(0.12, 0.7));
+        (t.inside || []).slice(0, 6).forEach(([name, benefit], i) => {
+          const x = [100, 560][i % 2], y = 530 + Math.floor(i / 2) * 285, w = 420, h = 255, p = a(0.35 + i * 0.28, 0.5);
+          if (p <= 0 || !name) return;
+          ctx.save(); ctx.globalAlpha *= clamp(p * 2); ctx.translate(0, (1 - ease.out(p)) * 60);
+          ctx.shadowColor = 'rgba(0,0,0,.16)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 14;
+          rrPath(ctx, x, y, w, h, 32); ctx.fillStyle = '#fff'; ctx.fill(); ctx.shadowColor = 'transparent';
+          leafDot(ctx, x + 64, y + 68, 34, LEAVES[i % LEAVES.length]);
+          txt(ctx, name, x + 116, y + 86, { f: F.sans, w: 800, s: 50, c: C.purple, a: 'left', max: w - 130 });
+          txt(ctx, benefit, x + 36, y + 182, { f: F.body, w: 500, s: 36, c: C.muted, a: 'left', max: w - 60 });
+          ctx.restore();
+        });
+        txt(ctx, t.insideMore, W / 2, 1440, { f: F.body, w: 600, s: 42, c: C.violet, alpha: ease.out(a(2.2, 0.5)), max: 940 });
+        txt(ctx, t.insideMoreList, W / 2, 1500, { f: F.body, w: 500, s: 30, c: C.muted, alpha: ease.out(a(2.4, 0.5)), max: 920 });
+      },
+      nothing(ctx, k) {
+        const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        bgDark(ctx, W, k.H, k.t);
+        reveal(ctx, t.nothingTitle1, W / 2, 420, { f: F.sans, w: 900, s: 124, ls: 6, c: '#fff', max: 940 }, a(0, 0.6));
+        reveal(ctx, t.nothingTitle2, W / 2, 565, { f: F.serif, w: 600, it: true, s: 120, c: C.lav, max: 940 }, a(0.15, 0.7));
+        lines(t.nothing).slice(0, 4).forEach((label, i) => {
+          const y = 790 + i * 150, p = a(0.5 + i * 0.3, 0.45);
+          if (p <= 0) return;
+          ctx.save(); ctx.globalAlpha *= clamp(p * 2);
+          ctx.save(); popScale(ctx, 250, y - 22, p, 0.3); crossIcon(ctx, 250, y - 22, 42); ctx.restore();
+          txt(ctx, label, 322, y, { f: F.sans, w: 700, s: 64, c: '#fff', a: 'left', max: 660 });
+          const sw = Math.min(660, measure(ctx, label, { f: F.sans, w: 700, s: 64 })) * ease.out(a(0.75 + i * 0.3, 0.35));
+          if (sw > 1) { ctx.strokeStyle = C.red; ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(322, y - 22); ctx.lineTo(322 + sw, y - 22); ctx.stroke(); }
+          ctx.restore();
+        });
+        stamp(ctx, t, W / 2, 1440, 150, a(2.2, 0.5));
+      },
+      howto(ctx, k) {
+        const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        bgLight(ctx, W, k.H, k.t);
+        const ap = ease.out(a(0, 0.6));
+        card(ctx, M.clipHowto || M.wide, 90, 200 + (1 - ap) * 70, 900, 660, { r: 40, zoom: 1.05, alpha: ap });
+        reveal(ctx, t.howTitle, W / 2, 1000, { f: F.serif, w: 600, it: true, s: 116, c: C.purple, max: 940 }, a(0.25, 0.7));
+        (t.steps || []).slice(0, 3).forEach(([title, sub], i) => {
+          const y = 1070 + i * 150, p = a(0.55 + i * 0.5, 0.5);
+          if (p <= 0 || !title) return;
+          ctx.save(); ctx.globalAlpha *= clamp(p * 2); ctx.translate((1 - ease.out(p)) * -60, 0);
+          ctx.beginPath(); ctx.arc(170, y + 50, 48, 0, Math.PI * 2); ctx.fillStyle = C.purple; ctx.fill();
+          txt(ctx, String(i + 1), 170, y + 68, { f: F.sans, w: 800, s: 52, c: '#fff' });
+          txt(ctx, title, 250, y + 44, { f: F.sans, w: 800, s: 50, c: C.ink, a: 'left', max: 720 });
+          txt(ctx, sub, 250, y + 96, { f: F.body, w: 500, s: 36, c: C.muted, a: 'left', max: 720 });
+          ctx.restore();
+        });
+        txt(ctx, t.howNote, W / 2, 1560, { f: F.body, w: 600, s: 40, c: C.violet, alpha: ease.out(a(2.2, 0.5)), max: 940 });
+      },
+    };
+  }
+
+  // ===================== 16:9 (1920x1080) =====================
+  function landscapeScenes(S) {
+    const t = S.t, M = S.media, B = S.brand;
+    return {
+      hook(ctx, k) {
+        const { W, H, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        bgLight(ctx, W, H, k.t);
+        logo(ctx, B, 140, 140, 76, C.purple, ease.out(a(0, 0.5)), 'left');
+        const hook = lines(t.hook).slice(0, 3);
+        hook.forEach((s, i) => reveal(ctx, s, 140, 370 + i * 110, { f: F.sans, w: 900, s: 104, ls: 2, c: C.purple, a: 'left', max: 900 }, a(0.12 + i * 0.14, 0.7)));
+        const ay = 370 + hook.length * 110 + 70;
+        reveal(ctx, t.hookAccent, 140, ay, { f: F.serif, w: 600, it: true, s: 170, c: C.violet, a: 'left', max: 920 }, a(0.6, 0.8));
+        const uw = 500 * ease.out(a(1.0, 0.6));
+        if (uw > 1 && t.hookAccent) { ctx.strokeStyle = C.violet; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(146, ay + 45); ctx.lineTo(146 + uw, ay + 45); ctx.stroke(); }
+        txt(ctx, t.hookUrdu, 146, Math.min(ay + 160, 1010), { f: F.urdu, w: 600, s: 48, c: C.deep, a: 'left', alpha: ease.out(a(1.2, 0.6)), max: 900 });
+        const ap = ease.out(a(0.25, 0.9));
+        glow(ctx, 1480, 560, 560, 'rgba(255,255,255,1)', 0.9);
+        ctx.save(); ctx.globalAlpha *= ap; ctx.strokeStyle = C.violet; ctx.lineWidth = 3; archPath(ctx, 1160, 130 + (1 - ap) * 120, 640, 800); ctx.stroke(); ctx.restore();
+        card(ctx, M.hero, 1184, 154 + (1 - ap) * 120, 640, 800, { shape: 'arch', zoom: lerp(1.15, 1, ease.out(pr(lt, 0.25, 2.8))), alpha: ap, sweep: pr(lt, 1.6, 1.0) });
+      },
+      reveal(ctx, k) {
+        const { W, H, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        const bg = M.clipWide || M.wide || M.hero;
+        cover(ctx, bg.el, 0, 0, W, H, lerp(1.08, 1, ease.out(pr(lt, 0, k.dur))), bg.fx, bg.fy);
+        const g = ctx.createLinearGradient(0, 0, W * 0.7, 0);
+        g.addColorStop(0, C.ink); g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.save(); ctx.globalAlpha = 0.94; ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore();
+        logo(ctx, B, 140, 140, 70, '#fff', ease.out(a(0, 0.5)), 'left');
+        txt(ctx, t.intro, 146, 390, { f: F.body, w: 600, s: 34, ls: 12, c: C.lav, a: 'left', alpha: ease.out(a(0.1, 0.5)) });
+        reveal(ctx, t.productLine1, 140, 560, { f: F.serif, w: 600, it: true, s: 180, c: '#fff', a: 'left', max: 1000 }, a(0.2, 0.7));
+        reveal(ctx, t.productLine2, 146, 690, { f: F.sans, w: 900, s: 124, ls: 8, c: '#fff', a: 'left', max: 1000 }, a(0.35, 0.7));
+        txt(ctx, (t.introChips || []).filter(Boolean).join('  ·  '), 148, 775, { f: F.body, w: 500, s: 36, c: C.lav, a: 'left', alpha: ease.out(a(0.9, 0.6)), max: 1000 });
+      },
+      benefits(ctx, k) {
+        const { W, H, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        bgLight(ctx, W, H, k.t);
+        const ap = ease.out(a(0, 0.7));
+        card(ctx, M.wide, 120 + (1 - ap) * -60, 170, 880, 660, { r: 40, zoom: lerp(1.02, 1.12, pr(lt, 0, k.dur)), alpha: ap });
+        reveal(ctx, t.benefitsTitle, 1100, 300, { f: F.serif, w: 600, it: true, s: 96, c: C.purple, a: 'left', max: 720 }, a(0.3, 0.7));
+        lines(t.benefits).slice(0, 4).forEach((b, i) => benefitChip(ctx, b, 1100, 360 + i * 122, 700, 96, a(0.65 + i * 0.42, 0.55)));
+      },
+      ingredients(ctx, k) {
+        const { W, H, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        bgDark(ctx, W, H, k.t);
+        if (t.countNumber) {
+          const n = Math.round(t.countNumber * ease.out(pr(lt, 0.1, 0.9)));
+          ctx.save(); popScale(ctx, 520, 480, a(0, 0.6), 0.7); ctx.globalAlpha *= clamp(a(0, 0.3) * 2);
+          txt(ctx, n + '+', 520, 600, { f: F.sans, w: 900, s: 340, c: '#fff', shadow: 'rgba(0,0,0,.3)' });
+          ctx.restore();
+        }
+        reveal(ctx, t.countLabel, 520, 705, { f: F.sans, w: 800, s: 54, ls: 4, c: C.lav, max: 820 }, a(0.4, 0.7));
+        txt(ctx, t.countUrdu, 520, 805, { f: F.urdu, w: 600, s: 44, c: '#fff', alpha: 0.92 * ease.out(a(0.65, 0.6)), dir: 'rtl', max: 820 });
+        tagCloud(ctx, t.tags, 1010, 800, 300, 84, 38, lt, 0.8, 0.06);
+        txt(ctx, t.freeFromLine, W / 2, 990, { f: F.body, w: 600, s: 28, ls: 3, c: C.lav, alpha: ease.out(a(1.6, 0.5)), max: 1700 });
+      },
+      offer(ctx, k) {
+        const { W, H, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
+        bgLight(ctx, W, H, k.t);
+        const ap = ease.out(a(0, 0.7));
+        card(ctx, M.square, 200, 160 + (1 - ap) * 60, 660, 650, { r: 44, zoom: lerp(1.14, 1, ease.out(pr(lt, 0, 1.6))), alpha: ap, sweep: pr(lt, 1.7, 1.0) });
+        priceBadge(ctx, t, 225, 760, 140, a(0.35, 0.6), k.t);
+        const cx = 1360;
+        logo(ctx, B, cx, 175, 70, C.purple, ease.out(a(0, 0.5)));
+        reveal(ctx, t.offerTitle, cx, 360, { f: F.sans, w: 900, s: 100, ls: 2, c: C.purple, max: 940 }, a(0.6, 0.6));
+        reveal(ctx, t.offerSub, cx, 450, { f: F.serif, w: 600, it: true, s: 80, c: C.violet, max: 940 }, a(0.75, 0.6));
+        txt(ctx, t.offerUrdu, cx, 540, { f: F.urdu, w: 600, s: 44, c: C.deep, alpha: ease.out(a(0.95, 0.6)), dir: 'rtl', max: 940 });
+        chipRow(ctx, t.offerChips, cx, 588, 66, 28, lt, 1.1, 0.1);
+        ctaButton(ctx, cx - 320, 700, 640, 112, a(1.35, 0.6), lt - 1.9, t.cta);
+        txt(ctx, t.url, cx, 900, { f: F.body, w: 600, s: 46, ls: 2, c: C.purple, alpha: ease.out(a(1.6, 0.6)), max: 940 });
+      },
+    };
+  }
+
+  // [scene name, base seconds, voice key, clip role]
+  const PLANS = {
+    motion: [['hook', 2.8], ['reveal', 3.0], ['benefits', 4.4], ['ingredients', 2.8], ['offer', 3.6]],
+    footage: [['meet', 3.4, 'meet', 'clipOpen'], ['inside', 4.4], ['nothing', 3.8], ['howto', 4.4, 'howto', 'clipHowto'], ['offer', 4.0]],
+    landscape: [['hook', 3.2], ['reveal', 3.6, 'reveal', 'clipWide'], ['benefits', 4.0], ['ingredients', 3.0], ['offer', 4.2]],
+  };
+
+  function available(format, name, S) {
+    const t = S.t, M = S.media;
+    if (name === 'benefits') return lines(t.benefits).length >= 2 && !!M.wide;
+    if (name === 'ingredients') return !!t.countNumber || lines(t.tags).length >= 3;
+    if (name === 'inside') return (t.inside || []).filter((r) => r && r[0]).length >= 2;
+    if (name === 'nothing') return lines(t.nothing).length >= 2;
+    if (name === 'howto') return (t.steps || []).filter((r) => r && r[0]).length >= 2;
+    if (name === 'meet') return !!M.clipOpen;
+    return true;
+  }
+
+  function build(format, S) {
+    const isWide = format === 'landscape';
+    const W = isWide ? 1920 : 1080, H = isWide ? 1080 : 1920;
+    const draw = isWide ? landscapeScenes(S) : portraitScenes(S);
+    let at = 0;
+    const scenes = [], voices = [], pop = [];
+    PLANS[format].forEach(([name, base, voiceKey, clipRole]) => {
+      if (!available(format, name, S)) return;
+      const key = voiceKey || name;
+      const vd = S.voiceDur[key] || 0;
+      const lead = scenes.length ? 0.3 : 0.15;
+      const len = Math.max(base, vd ? vd + lead + 0.5 : 0);
+      const clip = clipRole && S.media[clipRole] && S.media[clipRole].el.tagName === 'VIDEO' ? S.media[clipRole] : null;
+      scenes.push({ name, from: at, to: at + len, draw: draw[name], clip });
+      if (vd) voices.push({ key, at: at + lead });
+      if (name === 'benefits') lines(S.t.benefits).slice(0, 4).forEach((_, i) => pop.push(at + 0.65 + i * 0.42));
+      if (name === 'inside') (S.t.inside || []).slice(0, 6).forEach((_, i) => pop.push(at + 0.35 + i * 0.28));
+      if (name === 'nothing') lines(S.t.nothing).slice(0, 4).forEach((_, i) => pop.push(at + 0.5 + i * 0.3));
+      at += len;
+    });
+    const offer = scenes[scenes.length - 1];
+    return {
+      format, w: W, h: H, duration: at, scenes, voices,
+      cues: {
+        drop: scenes[1] ? scenes[1].from : 0,
+        whoosh: scenes.slice(1).map((s) => s.from),
+        hit: [offer.from + 0.35],
+        pop: pop.concat([1.1, 1.2, 1.3, 1.35].map((d) => offer.from + d)),
+      },
+    };
+  }
+
+  window.AdTemplates = { build, PLANS, available };
+})();

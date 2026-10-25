@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Setting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 
 class SettingController extends Controller
 {
@@ -58,6 +59,9 @@ class SettingController extends Controller
         'social_tiktok' => 'nullable|url|max:255',
         'social_youtube' => 'nullable|url|max:255',
         'footer_text' => 'nullable|string|max:300',
+        // Integrations
+        'tts_provider' => 'nullable|in:none,azure',
+        'azure_speech_region' => 'nullable|alpha_dash|max:40',
     ];
 
     protected const BOOLEANS = ['announcement_active', 'auto_approve_reviews', 'show_whatsapp_button'];
@@ -90,9 +94,16 @@ class SettingController extends Controller
             $rules[$image] = $image === 'favicon' ? 'nullable|image|mimes:png,jpg,jpeg,webp,ico|max:1024' : 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096';
         }
 
+        $rules['azure_speech_key'] = 'nullable|string|max:200';
         $data = $request->validate($rules);
 
         $values = collect($data)->only(array_keys(self::FIELDS))->all();
+        // Secret: stored encrypted; a blank field keeps the saved key.
+        if (filled($data['azure_speech_key'] ?? null)) {
+            $values['azure_speech_key'] = Crypt::encryptString(trim($data['azure_speech_key']));
+        } elseif ($request->boolean('remove_azure_speech_key')) {
+            $values['azure_speech_key'] = '';
+        }
         foreach (self::BOOLEANS as $flag) {
             $values[$flag] = $request->boolean($flag) ? '1' : '0';
         }
