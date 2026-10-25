@@ -35,7 +35,7 @@
             @endif
             <form method="POST" action="{{ route('contact.send') }}" class="form-grid">
                 @csrf
-                <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off">
+                <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-label="Leave this field empty">
                 <div class="field"><label for="c-name">Name</label><input id="c-name" class="input" name="name" value="{{ old('name') }}" required maxlength="120"></div>
                 <div class="field"><label for="c-phone">Phone <span class="opt">(optional)</span></label><input id="c-phone" class="input" name="phone" value="{{ old('phone') }}" maxlength="30"></div>
                 <div class="field full"><label for="c-email">Email <span class="opt">(optional)</span></label><input id="c-email" type="email" class="input" name="email" value="{{ old('email') }}"></div>

@@ -82,7 +82,8 @@
     </div>
 </header>
 
-<div class="mobile-nav" id="mobileNav" aria-hidden="true">
+{{-- Closed panels are inert: hidden from screen readers and AI agents and not reachable with Tab. --}}
+<div class="mobile-nav" id="mobileNav" aria-hidden="true" inert>
     <div class="panel">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
             <span class="eyebrow">Menu</span>
@@ -121,7 +122,7 @@
                 </div>
             </div>
             <div>
-                <h4>Shop</h4>
+                <h2 class="footer-title">Shop</h2>
                 <ul>
                     <li><a href="{{ route('shop') }}">All Products</a></li>
                     @foreach ($navCategories as $navCategory)
@@ -132,7 +133,7 @@
                 </ul>
             </div>
             <div>
-                <h4>Information</h4>
+                <h2 class="footer-title">Information</h2>
                 <ul>
                     @foreach ($footerPages as $footerPage)
                         <li><a href="{{ route('page.show', $footerPage->slug) }}">{{ $footerPage->title }}</a></li>
@@ -141,7 +142,7 @@
                 </ul>
             </div>
             <div>
-                @if (setting('store_phone') || setting('store_email') || setting('store_address'))<h4>Get in touch</h4>@endif
+                @if (setting('store_phone') || setting('store_email') || setting('store_address'))<h2 class="footer-title">Get in touch</h2>@endif
                 <ul>
                     @if (setting('store_phone'))<li style="display:flex;gap:10px"><x-icon name="phone" style="width:18px;flex:none;color:var(--gold-2)" /> <a href="tel:{{ preg_replace('/[^0-9+]/', '', setting('store_phone')) }}">{{ setting('store_phone') }}</a></li>@endif
                     @if (setting('store_email'))<li style="display:flex;gap:10px"><x-icon name="mail" style="width:18px;flex:none;color:var(--gold-2)" /> <a href="mailto:{{ setting('store_email') }}">{{ setting('store_email') }}</a></li>@endif
@@ -161,7 +162,7 @@
 </footer>
 
 {{-- Cart drawer --}}
-<aside class="drawer" id="cartDrawer" aria-label="Shopping bag" aria-hidden="true">
+<aside class="drawer" id="cartDrawer" aria-label="Shopping bag" aria-hidden="true" inert>
     <div class="drawer-head">
         <h3>Your Bag</h3>
         <button class="icon-btn" type="button" data-close-cart aria-label="Close bag"><x-icon name="close" /></button>

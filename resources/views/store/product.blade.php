@@ -166,12 +166,12 @@
             <div class="accordion">
                 @if ($product->description)
                     <details open>
-                        <summary>Description</summary>
+                        <summary><h2 class="acc-title">Description</h2></summary>
                         <div class="content rich">{!! safe_html($product->description) !!}</div>
                     </details>
                 @endif
                 <details>
-                    <summary>Delivery &amp; Payment</summary>
+                    <summary><h2 class="acc-title">Delivery &amp; Payment</h2></summary>
                     <div class="content">
                         <p>Delivery charges: {{ (float) setting('shipping_fee') > 0 ? money(setting('shipping_fee')) : 'Free' }}{{ setting('free_shipping_min') ? ' · Free delivery on orders above '.money(setting('free_shipping_min')) : '' }}.</p>
                         <p>Estimated delivery: {{ setting('delivery_time', '2–4 working days') }}.</p>
@@ -238,13 +238,13 @@
                 @endif
                 <form method="POST" action="{{ route('reviews.store', $product) }}" class="form-grid">
                     @csrf
-                    <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off">
+                    <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-label="Leave this field empty">
                     <div class="field full">
                         <label>Your rating</label>
                         <div class="star-input">
                             @for ($s = 5; $s >= 1; $s--)
                                 <input type="radio" name="rating" id="rate{{ $s }}" value="{{ $s }}" @checked(old('rating', 5) == $s)>
-                                <label for="rate{{ $s }}" aria-label="{{ $s }} stars"><x-icon name="star" /></label>
+                                <label for="rate{{ $s }}"><x-icon name="star" /><span class="sr-only">{{ $s }} stars</span></label>
                             @endfor
                         </div>
                     </div>

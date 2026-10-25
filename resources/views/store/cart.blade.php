@@ -17,7 +17,7 @@
         @if ($items->isEmpty())
             <div class="empty-state">
                 <x-icon name="bag" />
-                <h4>Your bag is empty</h4>
+                <h2>Your bag is empty</h2>
                 <p class="muted">Looks like you haven't added anything yet.</p>
                 <a href="{{ route('shop') }}" class="btn btn-primary" style="margin-top:12px">Continue Shopping</a>
             </div>

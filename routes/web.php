@@ -54,6 +54,7 @@ Route::get('/pages/{page:slug}', [PageController::class, 'show'])->name('page.sh
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('seo.sitemap');
 Route::get('/robots.txt', [SeoController::class, 'robots'])->name('seo.robots');
 Route::get('/ads.txt', [SeoController::class, 'adsTxt'])->name('seo.ads');
+Route::get('/llms.txt', [SeoController::class, 'llmsTxt'])->name('seo.llms');
 Route::post('/t', [TrackController::class, 'collect'])->name('track.collect')->middleware('throttle:120,1');
 
 /*

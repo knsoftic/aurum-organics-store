@@ -323,10 +323,11 @@ p { margin: 0 0 1em; }
 .accordion details:last-child { border-bottom: 1px solid var(--line); }
 .accordion summary { cursor: pointer; list-style: none; padding: 20px 0; display: flex; justify-content: space-between; font-size: 13px; letter-spacing: .18em; text-transform: uppercase; font-weight: 500; }
 .accordion summary::-webkit-details-marker { display: none; }
+.accordion summary .acc-title { font: inherit; letter-spacing: inherit; color: inherit; margin: 0; }
 .accordion summary::after { content: '+'; font-size: 20px; line-height: 1; color: var(--gold); }
 .accordion details[open] summary::after { content: '−'; }
 .accordion .content { padding-bottom: 24px; color: var(--muted); font-weight: 300; }
-.rich h3 { font-size: 24px; margin-top: 1.2em; }
+.rich h2, .rich h3 { font-size: 24px; margin-top: 1.2em; }
 .rich ul { padding-left: 20px; }
 .rich li { margin-bottom: 6px; }
 .wa-order { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 14px; padding: 14px; border: 1px dashed var(--line); border-radius: var(--radius); margin-top: 6px; color: var(--success); }
@@ -348,7 +349,7 @@ p { margin: 0 0 1em; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .form-grid .full { grid-column: 1 / -1; }
 .field label { display: block; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; font-weight: 500; margin-bottom: 8px; color: var(--ink); }
-.field label .opt { text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 400; }
+.field label .opt { text-transform: none; letter-spacing: 0; color: inherit; opacity: .8; font-weight: 400; }
 .input, .textarea {
   width: 100%; padding: 15px 16px; background: var(--white); border: 1px solid var(--line); border-radius: var(--radius);
   font-size: 15px; transition: border-color .25s, box-shadow .25s; outline: none;
@@ -400,7 +401,7 @@ p { margin: 0 0 1em; }
 .drawer-foot .btn + .btn { margin-top: 10px; }
 .empty-state { text-align: center; padding: 60px 30px; margin: auto; }
 .empty-state svg { width: 54px; height: 54px; color: var(--gold); stroke-width: 1.1; margin: 0 auto 16px; }
-.empty-state h4 { font-size: 26px; }
+.empty-state h2, .empty-state h4 { font-size: 26px; }
 .ship-progress { padding: 16px 28px; background: var(--cream); font-size: 13px; text-align: center; }
 .ship-progress .track { height: 4px; background: rgba(0,0,0,.08); border-radius: 2px; margin-top: 10px; overflow: hidden; }
 .ship-progress .track span { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), var(--gold-2)); transition: width .6s var(--ease); }
@@ -408,12 +409,13 @@ p { margin: 0 0 1em; }
 /* ---------- Footer ---------- */
 .site-footer { background: var(--ink); color: color-mix(in srgb, var(--cream) 70%, transparent); padding: 90px 0 0; margin-top: 0; }
 .footer-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1.2fr; gap: 50px; padding-bottom: 60px; }
-.site-footer h4 { font-family: var(--sans); font-size: 12px; letter-spacing: .24em; text-transform: uppercase; font-weight: 500; color: var(--gold-2); margin-bottom: 22px; }
-.site-footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; font-size: 14.5px; }
+.site-footer .footer-title { font-family: var(--sans); font-size: 12px; letter-spacing: .24em; text-transform: uppercase; font-weight: 500; color: var(--gold-2); margin-bottom: 22px; }
+.site-footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 14.5px; }
+.site-footer ul a { display: inline-block; padding: 3px 0; min-height: 24px; }
 .site-footer a:hover { color: var(--gold-2); }
 .site-footer .brand { align-items: flex-start; text-align: left; margin-bottom: 20px; }
 .site-footer .brand-name { color: var(--cream); padding-left: 0; }
-.site-footer .brand-sub { padding-left: 0; }
+.site-footer .brand-sub { padding-left: 0; color: var(--gold-2); }
 .socials { display: flex; gap: 10px; margin-top: 24px; }
 .socials a { width: 40px; height: 40px; border: 1px solid color-mix(in srgb, var(--gold-2) 35%, transparent); border-radius: 50%; display: grid; place-items: center; transition: all .3s; }
 .socials a:hover { background: var(--gold); border-color: var(--gold); color: #fff; }
@@ -699,4 +701,4 @@ p { margin: 0 0 1em; }
 }
 
 /* Sections below the first screen are laid out only when they come close (much faster first load on phones). */
-main > section:not(:first-child), .site-footer { content-visibility: auto; contain-intrinsic-size: auto 760px; }
+main > section:not(:first-child) { content-visibility: auto; contain-intrinsic-size: auto 760px; }

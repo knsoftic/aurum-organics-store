@@ -23,22 +23,30 @@
   if (window.Store.flash) setTimeout(() => toast(window.Store.flash, window.Store.flashType), 300);
 
   /* ---------- Overlays: cart drawer + mobile menu ---------- */
+  // Closed panels stay inert (not focusable, hidden from assistive tech and AI agents).
+  function setOpen(panel, open) {
+    if (!panel) return;
+    panel.classList.toggle('open', open);
+    panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+    panel.inert = !open;
+  }
   function openCart() {
-    drawer.classList.add('open');
-    drawer.setAttribute('aria-hidden', 'false');
+    setOpen(drawer, true);
     overlay.classList.add('show');
     document.body.style.overflow = 'hidden';
+    const close = drawer.querySelector('[data-close-cart]');
+    if (close) close.focus();
   }
   function closeAll() {
-    drawer && drawer.classList.remove('open');
-    mobileNav && mobileNav.classList.remove('open');
+    setOpen(drawer, false);
+    setOpen(mobileNav, false);
     overlay && overlay.classList.remove('show');
     document.body.style.overflow = '';
   }
   document.addEventListener('click', (e) => {
     if (e.target.closest('[data-open-cart]')) { e.preventDefault(); openCart(); }
     if (e.target.closest('[data-close-cart]') || e.target === overlay) closeAll();
-    if (e.target.closest('[data-open-menu]')) { mobileNav.classList.add('open'); overlay.classList.add('show'); }
+    if (e.target.closest('[data-open-menu]')) { setOpen(mobileNav, true); overlay.classList.add('show'); }
     if (e.target.closest('[data-close-menu]')) closeAll();
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(); });

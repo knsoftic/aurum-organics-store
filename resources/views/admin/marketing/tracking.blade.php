@@ -143,6 +143,7 @@
                 <div class="card-body" style="display:grid;gap:10px;font-size:13px">
                     <a class="btn btn-light btn-sm" href="{{ route('seo.sitemap') }}" target="_blank"><x-icon name="external" /> sitemap.xml</a>
                     <a class="btn btn-light btn-sm" href="{{ route('seo.robots') }}" target="_blank"><x-icon name="external" /> robots.txt</a>
+                    <a class="btn btn-light btn-sm" href="{{ route('seo.llms') }}" target="_blank" title="Store summary for AI assistants (ChatGPT, Gemini, Perplexity)"><x-icon name="external" /> llms.txt (for AI)</a>
                     <a class="btn btn-light btn-sm" href="https://search.google.com/test/rich-results?url={{ urlencode(url('/')) }}" target="_blank" rel="noopener"><x-icon name="external" /> Google Rich Results test</a>
                     <p class="muted" style="margin:0">Pixels: install the <strong>Meta Pixel Helper</strong> / <strong>TikTok Pixel Helper</strong> Chrome extensions and open the store — they show each event as it fires.</p>
                 </div>

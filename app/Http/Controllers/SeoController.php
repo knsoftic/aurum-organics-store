@@ -54,6 +54,47 @@ class SeoController extends Controller
         return response(implode("\n", $lines)."\n", 200, ['Content-Type' => 'text/plain; charset=UTF-8']);
     }
 
+    /** llms.txt (llmstxt.org): a Markdown summary of the store for AI assistants and agents. */
+    public function llmsTxt()
+    {
+        $text = Cache::remember('seo.llms', 3600, function () {
+            $store = setting('store_name', config('app.name'));
+            $line = fn ($s) => trim(preg_replace('/\s+/', ' ', strip_tags((string) $s)));
+            $out = ['# '.$store, '', '> '.$line(setting('meta_description') ?: setting('tagline')), ''];
+
+            $facts = array_filter([
+                'Online store in Pakistan. Prices are in '.setting('currency_code', 'PKR').'.',
+                (float) setting('shipping_fee', 0) <= 0 ? 'Free delivery all over Pakistan.' : null,
+                \App\Models\PaymentMethod::active()->where('type', \App\Models\PaymentMethod::TYPE_COD)->exists() ? 'Cash on Delivery is available.' : null,
+                setting('delivery_time') ? 'Delivery time: '.setting('delivery_time').'.' : null,
+                setting('return_policy_short') ? 'Returns: '.setting('return_policy_short').'.' : null,
+            ]);
+            $out[] = implode(' ', $facts);
+            $out[] = '';
+
+            $out[] = '## Products';
+            foreach (Product::active()->sorted()->get() as $p) {
+                $out[] = '- ['.$p->name.($p->size_label ? ' ('.$p->size_label.')' : '').']('.route('product.show', $p).'): '
+                    .$line($p->short_description).' Price: '.money($p->price).'.';
+            }
+            $out[] = '';
+
+            $out[] = '## Customer information';
+            foreach (Page::where('is_active', true)->get() as $page) {
+                $out[] = '- ['.$page->title.']('.route('page.show', $page).')';
+            }
+            $out[] = '- [Track an order]('.route('track').')';
+            $out[] = '- [Contact us]('.route('contact').')'.(setting('store_phone') ? ': phone '.setting('store_phone') : '').(setting('store_email') ? ', email '.setting('store_email') : '');
+            $out[] = '';
+            $out[] = '## Optional';
+            $out[] = '- [Sitemap]('.route('seo.sitemap').')';
+
+            return implode("\n", $out)."\n";
+        });
+
+        return response($text, 200, ['Content-Type' => 'text/plain; charset=UTF-8']);
+    }
+
     /** AdSense needs this file; the publisher line is added automatically. */
     public function adsTxt()
     {
