@@ -1,0 +1,196 @@
+@extends('layouts.store')
+
+@section('title', $product->meta_title ?: $product->name)
+@section('meta_description', $product->meta_description ?: $product->short_description)
+@section('og_image', $product->image_url)
+
+@php
+    $gallery = $product->gallery;
+    $lowStock = $product->track_stock && $product->stock > 0 && $product->stock <= (int) setting('low_stock_threshold', 5);
+    $ratingTotal = max(1, $product->rating_count);
+@endphp
+
+@section('content')
+<div class="container">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href="{{ route('home') }}">Home</a><span class="sep">/</span>
+        <a href="{{ route('shop') }}">{{ $product->category?->name ?? 'Shop' }}</a><span class="sep">/</span>
+        <span>{{ $product->name }}</span>
+    </nav>
+
+    <div class="pdp">
+        {{-- Gallery --}}
+        <div class="gallery" data-gallery>
+            @if (count($gallery) > 1)
+                <div class="gallery-thumbs">
+                    @foreach ($gallery as $i => $url)
+                        <button type="button" class="{{ $i === 0 ? 'active' : '' }}" data-gallery-thumb data-src="{{ $url }}" aria-label="Image {{ $i + 1 }}">
+                            <img src="{{ $url }}" alt="">
+                        </button>
+                    @endforeach
+                </div>
+            @endif
+            <div class="gallery-main" style="{{ count($gallery) > 1 ? '' : 'grid-column:1/-1' }}">
+                @if ($product->badge)<span class="badge">{{ $product->badge }}</span>@endif
+                <img src="{{ $gallery[0] }}" alt="{{ $product->name }}" data-gallery-main>
+            </div>
+        </div>
+
+        {{-- Info --}}
+        <div class="pdp-info">
+            <span class="cat">{{ $product->category?->name }}{{ $product->size_label ? ' · '.$product->size_label : '' }}</span>
+            <h1>{{ $product->name }}</h1>
+            @if ($product->rating_count)
+                <a href="#reviews" class="pdp-rating"><x-stars :rating="$product->rating" /> {{ number_format($product->rating, 1) }} · {{ $product->rating_count }} {{ \Illuminate\Support\Str::plural('review', $product->rating_count) }}</a>
+            @endif
+
+            <div class="pdp-price">
+                {{ money($product->price) }}
+                @if ($product->discount_percent)
+                    <del>{{ money($product->compare_price) }}</del>
+                    <span class="save-tag">Save {{ $product->discount_percent }}%</span>
+                @endif
+            </div>
+
+            @if ($product->short_description)<p class="pdp-desc">{{ $product->short_description }}</p>@endif
+
+            @if ($product->highlights)
+                <ul class="highlights">
+                    @foreach ($product->highlights as $line)
+                        <li><x-icon name="check" /> {{ $line }}</li>
+                    @endforeach
+                </ul>
+            @endif
+
+            @if (! $product->isInStock())
+                <div class="stock-line out">Currently out of stock</div>
+            @elseif ($lowStock)
+                <div class="stock-line low">Only {{ $product->stock }} left — order soon</div>
+            @else
+                <div class="stock-line">In stock · ready to ship</div>
+            @endif
+
+            @if ($product->isInStock())
+                <form action="{{ route('cart.add', $product) }}" method="POST" data-ajax-cart>
+                    @csrf
+                    <div class="buy-row">
+                        <div class="qty">
+                            <button type="button" data-step="-1" aria-label="Decrease quantity">−</button>
+                            <input type="number" name="qty" value="1" min="1" max="{{ $product->maxPurchasable() }}" aria-label="Quantity">
+                            <button type="button" data-step="1" aria-label="Increase quantity">+</button>
+                        </div>
+                        <button type="submit" class="btn btn-primary"><x-icon name="bag" /> Add to Bag</button>
+                    </div>
+                    <button type="submit" name="buy_now" value="1" class="btn btn-gold btn-block">Buy It Now</button>
+                </form>
+            @endif
+
+            @if ($wa = whatsapp_link('Hi! I would like to order '.$product->name.' ('.money($product->price).').'))
+                <a href="{{ $wa }}" target="_blank" rel="noopener" class="wa-order"><x-icon name="whatsapp" style="width:20px" /> Order on WhatsApp</a>
+            @endif
+
+            <div class="assurances">
+                <div class="assurance"><x-icon name="cash" /><div><strong>Cash on Delivery</strong>All over Pakistan</div></div>
+                <div class="assurance"><x-icon name="truck" /><div><strong>Fast Delivery</strong>{{ setting('delivery_time', '2–4 working days') }}</div></div>
+                <div class="assurance"><x-icon name="refresh" /><div><strong>Easy Returns</strong>{{ setting('return_policy_short', '7-day returns') }}</div></div>
+            </div>
+
+            <div class="accordion">
+                @if ($product->description)
+                    <details open>
+                        <summary>Description</summary>
+                        <div class="content rich">{!! safe_html($product->description) !!}</div>
+                    </details>
+                @endif
+                <details>
+                    <summary>Delivery &amp; Payment</summary>
+                    <div class="content">
+                        <p>Delivery charges: {{ (float) setting('shipping_fee') > 0 ? money(setting('shipping_fee')) : 'Free' }}{{ setting('free_shipping_min') ? ' · Free delivery on orders above '.money(setting('free_shipping_min')) : '' }}.</p>
+                        <p>Estimated delivery: {{ setting('delivery_time', '2–4 working days') }}.</p>
+                        <p style="margin:0">Pay with Cash on Delivery, or pay in advance via {{ \App\Models\PaymentMethod::active()->where('type', '!=', 'cod')->pluck('name')->join(', ', ' or ') ?: 'bank transfer' }}.</p>
+                    </div>
+                </details>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Reviews --}}
+<section class="section bg-cream" id="reviews">
+    <div class="container reviews-wrap">
+        <aside class="rating-summary">
+            <span class="eyebrow">Reviews</span>
+            <div style="display:flex;align-items:flex-end;gap:12px;margin:16px 0 8px">
+                <span class="rating-big">{{ $product->rating_count ? number_format($product->rating, 1) : '—' }}</span>
+                <span class="muted" style="padding-bottom:8px">/ 5</span>
+            </div>
+            <x-stars :rating="$product->rating" />
+            <p class="muted" style="font-size:13px;margin:8px 0 18px">Based on {{ $product->rating_count }} {{ \Illuminate\Support\Str::plural('review', $product->rating_count) }}</p>
+            @for ($star = 5; $star >= 1; $star--)
+                @php $count = (int) ($ratingBreakdown[$star] ?? 0); @endphp
+                <div class="bar-row"><span>{{ $star }}★</span><div class="bar"><span style="width: {{ round($count / $ratingTotal * 100) }}%"></span></div><span>{{ $count }}</span></div>
+            @endfor
+            <a href="#write-review" class="btn btn-outline btn-block btn-sm" style="margin-top:20px">Write a Review</a>
+        </aside>
+
+        <div>
+            <h2 class="section-title" style="margin-bottom:10px">What customers <em>say</em></h2>
+            @forelse ($reviews as $review)
+                <article class="review">
+                    <div class="review-head">
+                        <div>
+                            <strong>{{ $review->name }}</strong>
+                            @if ($review->city)<span class="muted"> · {{ $review->city }}</span>@endif
+                            <div><x-stars :rating="$review->rating" /> <span class="verified">✓ Verified buyer</span></div>
+                        </div>
+                        <span class="muted" style="font-size:13px">{{ $review->created_at->format('d M Y') }}</span>
+                    </div>
+                    <p style="margin:0">{{ $review->comment }}</p>
+                </article>
+            @empty
+                <p class="muted" style="padding:20px 0">No reviews yet — be the first to share your experience.</p>
+            @endforelse
+
+            <div id="write-review" style="margin-top:50px;background:var(--white);border:1px solid var(--line);padding:34px;border-radius:var(--radius)">
+                <h3 style="font-size:28px">Share your experience</h3>
+                @if ($errors->any())
+                    <div class="alert alert-error"><ul>@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
+                @endif
+                <form method="POST" action="{{ route('reviews.store', $product) }}" class="form-grid">
+                    @csrf
+                    <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off">
+                    <div class="field full">
+                        <label>Your rating</label>
+                        <div class="star-input">
+                            @for ($s = 5; $s >= 1; $s--)
+                                <input type="radio" name="rating" id="rate{{ $s }}" value="{{ $s }}" @checked(old('rating', 5) == $s)>
+                                <label for="rate{{ $s }}" aria-label="{{ $s }} stars"><x-icon name="star" /></label>
+                            @endfor
+                        </div>
+                    </div>
+                    <div class="field"><label for="r-name">Name</label><input id="r-name" class="input" name="name" value="{{ old('name') }}" required maxlength="80"></div>
+                    <div class="field"><label for="r-city">City <span class="opt">(optional)</span></label><input id="r-city" class="input" name="city" value="{{ old('city') }}" maxlength="60"></div>
+                    <div class="field full"><label for="r-comment">Review</label><textarea id="r-comment" class="textarea" name="comment" required minlength="10" maxlength="1500">{{ old('comment') }}</textarea></div>
+                    <div class="full"><button class="btn btn-primary" type="submit">Submit Review</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+
+@if ($related->isNotEmpty())
+    <section class="section">
+        <div class="container">
+            <div class="section-head center">
+                <span class="eyebrow center">You may also like</span>
+                <h2 class="section-title">Complete the <em>ritual</em></h2>
+            </div>
+            <div class="product-grid {{ $related->count() <= 3 ? 'cols-3' : '' }}">
+                @foreach ($related as $item)
+                    @include('store.partials.product-card', ['product' => $item])
+                @endforeach
+            </div>
+        </div>
+    </section>
+@endif
+@endsection

@@ -1,0 +1,80 @@
+<?php
+
+use App\Models\Setting;
+
+if (! function_exists('setting')) {
+    /**
+     * Read a store setting (cached). Settings are edited from Admin → Settings.
+     */
+    function setting(string $key, mixed $default = null): mixed
+    {
+        return Setting::getValue($key, $default);
+    }
+}
+
+if (! function_exists('money')) {
+    function money(float|int|string|null $amount, bool $withSymbol = true): string
+    {
+        $amount = (float) $amount;
+        $decimals = fmod($amount, 1.0) == 0.0 ? 0 : 2;
+        $formatted = number_format($amount, $decimals);
+
+        return $withSymbol ? trim(setting('currency_symbol', 'Rs.').' '.$formatted) : $formatted;
+    }
+}
+
+if (! function_exists('media_url')) {
+    /**
+     * Public URL for a file stored on the "uploads" disk (public/uploads).
+     */
+    function media_url(?string $path, ?string $fallback = null): string
+    {
+        if (! $path) {
+            return $fallback ?? asset('images/placeholder.svg');
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+
+        return asset('uploads/'.ltrim($path, '/'));
+    }
+}
+
+if (! function_exists('safe_html')) {
+    /**
+     * Admin-authored rich text: keep simple formatting tags, drop scripts,
+     * inline event handlers and javascript: links.
+     */
+    function safe_html(?string $html): string
+    {
+        if (! $html) {
+            return '';
+        }
+
+        if (strip_tags($html) === $html) {
+            return nl2br(e($html));
+        }
+
+        $clean = strip_tags($html, '<p><br><b><strong><i><em><u><ul><ol><li><h2><h3><h4><a><blockquote><span><hr>');
+        $clean = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean);
+        $clean = preg_replace('/(href|src)\s*=\s*("|\')\s*javascript:[^"\']*\2/i', '$1="#"', $clean);
+
+        return $clean;
+    }
+}
+
+if (! function_exists('whatsapp_link')) {
+    function whatsapp_link(?string $message = null): ?string
+    {
+        $number = preg_replace('/\D+/', '', (string) setting('whatsapp_number'));
+        if (! $number) {
+            return null;
+        }
+        if (str_starts_with($number, '0')) {
+            $number = '92'.substr($number, 1);
+        }
+
+        return 'https://wa.me/'.$number.($message ? '?text='.rawurlencode($message) : '');
+    }
+}
