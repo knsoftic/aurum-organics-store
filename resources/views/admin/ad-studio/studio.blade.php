@@ -21,14 +21,18 @@
         'uploads' => rtrim(asset('uploads'), '/'),
         'brandMark' => setting('brand_mark') ? media_url(setting('brand_mark')) : null,
         'storeColor' => $themeColors[setting('theme', 'emerald')] ?? '#5a2ea6',
-        'ttsReady' => $ttsReady,
-        'voices' => \App\Models\AdProject::VOICES,
+        'ttsReady' => (bool) $ttsProvider,
+        'ttsProvider' => $ttsProvider,
+        'ttsLabel' => $ttsProvider ? \App\Services\Tts\TtsManager::PROVIDERS[$ttsProvider] : null,
+        'aiProvider' => $aiProvider,
+        'voices' => \App\Services\Tts\TtsManager::voices($ttsProvider),
         'voiceKeys' => \App\Models\AdProject::VOICE_KEYS,
         'formats' => \App\Models\AdProject::FORMATS,
         'settingsUrl' => route('admin.settings.edit').'#integrations',
         'routes' => [
             'update' => route('admin.ad-studio.update', $project),
             'regenerate' => route('admin.ad-studio.regenerate', $project),
+            'aiScript' => route('admin.ad-studio.ai-script', $project),
             'media' => route('admin.ad-studio.media', $project),
             'tts' => route('admin.ad-studio.tts', $project),
             'voice' => route('admin.ad-studio.voice', $project),
@@ -76,6 +80,10 @@
                     <button type="button" class="btn btn-light btn-sm" id="previewPlay"><x-icon name="play" /> Play</button>
                     <input type="range" id="previewTime" min="0" max="10" step="0.033" value="1.5" style="flex:1;accent-color:var(--gold)">
                     <span class="muted" id="previewClock" style="font-size:12px;min-width:70px;text-align:right">0.0s</span>
+                </div>
+                <div class="flex between wrap" style="margin-top:10px;gap:8px">
+                    <span class="muted" id="previewLook" style="font-size:12px;flex:1"></span>
+                    <button type="button" class="btn btn-light btn-sm" id="previewShuffle">🎲 Shuffle look</button>
                 </div>
                 <p class="muted" style="font-size:12px;margin:8px 0 0">Preview is silent — the voice and music are mixed in when you render.</p>
             </div>

@@ -22,26 +22,58 @@
 
     {{-- INTEGRATIONS --}}
     <div class="tab-panel" data-tab-panel="integrations">
-        <div class="grid grid-2">
-            <div class="card">
-                <div class="card-head"><h3>Urdu voice for Ad Studio (Azure AI Speech)</h3></div>
-                <div class="card-body form-grid">
-                    <div class="field full"><label>Voice provider</label>
-                        <select class="select" name="tts_provider">
-                            <option value="none" @selected($v('tts_provider', 'none') === 'none')>None — record your own voice or upload audio</option>
-                            <option value="azure" @selected($v('tts_provider') === 'azure')>Microsoft Azure AI Speech (realistic Urdu voices)</option>
-                        </select>
-                    </div>
-                    <div class="field"><label>Speech key</label>
-                        <input class="input" type="password" name="azure_speech_key" autocomplete="off" placeholder="{{ setting('azure_speech_key') ? '•••••••• saved — leave blank to keep' : 'Paste KEY 1 from Azure' }}">
-                        @if (setting('azure_speech_key'))<label class="switch" style="margin-top:8px;font-weight:400"><input type="checkbox" name="remove_azure_speech_key" value="1"><span class="track"></span> Remove saved key</label>@endif
-                    </div>
-                    <div class="field"><label>Region</label><input class="input" name="azure_speech_region" value="{{ $v('azure_speech_region') }}" placeholder="e.g. eastus, centralindia, uaenorth"></div>
-                    <div class="field full hint" style="line-height:1.6">
-                        Free tier: 500,000 characters / month (one ad ≈ 400 characters).
-                        Azure portal → Create resource → <strong>Speech</strong> → pricing tier <strong>Free F0</strong> → Keys and Endpoint → copy <strong>KEY 1</strong> and <strong>Location/Region</strong>.
-                        The key is stored encrypted.
-                    </div>
+        @php
+            $secretField = function ($name, $label, $placeholder) {
+                $saved = setting($name);
+                return '<div class="field full"><label>'.$label.'</label>'
+                    .'<input class="input" type="password" name="'.$name.'" autocomplete="off" placeholder="'.e($saved ? '•••••••• saved — leave blank to keep' : $placeholder).'">'
+                    .($saved ? '<label class="switch" style="margin-top:8px;font-weight:400"><input type="checkbox" name="remove_'.$name.'" value="1"><span class="track"></span> Remove saved key</label>' : '')
+                    .'</div>';
+            };
+        @endphp
+        <div class="card">
+            <div class="card-head"><h3>Ad Studio — AI voice &amp; script writer</h3></div>
+            <div class="card-body form-grid">
+                <div class="field full"><label>Provider</label>
+                    <select class="select" name="tts_provider" id="ttsProvider">
+                        <option value="none" @selected($v('tts_provider', 'none') === 'none')>None — record your own voice or upload audio</option>
+                        @foreach (\App\Services\Tts\TtsManager::PROVIDERS as $key => $label)
+                            <option value="{{ $key }}" @selected($v('tts_provider') === $key)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    <div class="hint">Gemini and OpenAI keys also power the “Write with AI” script button.</div>
+                </div>
+                <div class="field full"><label>Voice style (how the AI should speak)</label>
+                    <textarea class="textarea" name="voice_style" style="min-height:70px" placeholder="{{ \App\Services\Tts\TtsManager::DEFAULT_STYLE }}">{{ $v('voice_style') }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-3" style="margin-top:20px">
+            <div class="card" data-show-when="#ttsProvider=gemini,none">
+                <div class="card-head"><h3>Google Gemini <span class="badge b-green plain">Free tier</span></h3></div>
+                <div class="card-body form-grid" style="grid-template-columns:1fr">
+                    {!! $secretField('gemini_api_key', 'API key', 'Paste key from aistudio.google.com') !!}
+                    <div class="field"><label>Voice model</label><input class="input" name="gemini_tts_model" value="{{ $v('gemini_tts_model') }}" placeholder="gemini-3.8-flash-tts"></div>
+                    <div class="field"><label>Script model</label><input class="input" name="gemini_text_model" value="{{ $v('gemini_text_model') }}" placeholder="gemini-3.8-flash"></div>
+                    <div class="hint" style="line-height:1.6">Get a free key: <strong>aistudio.google.com</strong> → Get API key → Create. No card needed. Urdu is not on Google's official voice list, so listen to a line first. Free-tier requests may be used by Google to improve its products.</div>
+                </div>
+            </div>
+            <div class="card" data-show-when="#ttsProvider=openai,none">
+                <div class="card-head"><h3>OpenAI <span class="badge b-blue plain">openai.fm voices</span></h3></div>
+                <div class="card-body form-grid" style="grid-template-columns:1fr">
+                    {!! $secretField('openai_api_key', 'API key', 'sk-…') !!}
+                    <div class="field"><label>Voice model</label><input class="input" name="openai_tts_model" value="{{ $v('openai_tts_model') }}" placeholder="gpt-4o-mini-tts"></div>
+                    <div class="field"><label>Script model</label><input class="input" name="openai_text_model" value="{{ $v('openai_text_model') }}" placeholder="gpt-4o-mini"></div>
+                    <div class="hint" style="line-height:1.6">The same voices as openai.fm, with official Urdu support. Paid per use (roughly 1–2 US cents per minute of audio): platform.openai.com → API keys, and add a little billing credit.</div>
+                </div>
+            </div>
+            <div class="card" data-show-when="#ttsProvider=azure">
+                <div class="card-head"><h3>Microsoft Azure</h3></div>
+                <div class="card-body form-grid" style="grid-template-columns:1fr">
+                    {!! $secretField('azure_speech_key', 'Speech key', 'Paste KEY 1 from Azure') !!}
+                    <div class="field"><label>Region</label><input class="input" name="azure_speech_region" value="{{ $v('azure_speech_region') }}" placeholder="e.g. eastus, centralindia"></div>
+                    <div class="hint">Voice only (no AI script writing).</div>
                 </div>
             </div>
         </div>

@@ -75,25 +75,83 @@
     ctx.restore();
   }
 
-  function priceBadge(ctx, t, cx, cy, r, p, time) {
+  // Price badge in three shapes (circle, starburst, ribbon) chosen by the video's look.
+  function priceBadge(ctx, t, cx, cy, r, p, time, shape = 'circle') {
     if (p <= 0 || !t.price) return;
     ctx.save(); ctx.globalAlpha *= clamp(p * 2);
     popScale(ctx, cx, cy, p, 0.3);
+    const g = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+    g.addColorStop(0, C.royal); g.addColorStop(1, C.deep);
+    if (shape === 'ribbon') {
+      ctx.translate(cx, cy); ctx.rotate(-0.12); ctx.translate(-cx, -cy);
+      const w = r * 2.3, h = r * 1.35;
+      ctx.shadowColor = 'rgba(0,0,0,.4)'; ctx.shadowBlur = r * 0.4; ctx.shadowOffsetY = r * 0.12;
+      ctx.beginPath();
+      ctx.moveTo(cx - w / 2, cy - h / 2); ctx.lineTo(cx + w / 2, cy - h / 2); ctx.lineTo(cx + w / 2 - r * 0.22, cy);
+      ctx.lineTo(cx + w / 2, cy + h / 2); ctx.lineTo(cx - w / 2, cy + h / 2); ctx.lineTo(cx - w / 2 + r * 0.22, cy); ctx.closePath();
+      ctx.fillStyle = g; ctx.fill(); ctx.shadowColor = 'transparent';
+      ctx.setLineDash([r * 0.06, r * 0.06]); ctx.lineWidth = r * 0.02; ctx.strokeStyle = 'rgba(255,255,255,.5)';
+      rrPath(ctx, cx - w / 2 + r * 0.3, cy - h / 2 + r * 0.14, w - r * 0.6, h - r * 0.28, r * 0.06); ctx.stroke(); ctx.setLineDash([]);
+      txt(ctx, 'ONLY  ' + (t.currency || 'Rs.'), cx, cy - r * 0.2, { f: F.body, w: 600, s: r * 0.2, ls: r * 0.03, c: C.lav });
+      txt(ctx, t.price, cx, cy + r * 0.38, { f: F.sans, w: 900, s: r * 0.56, c: '#fff', max: w - r * 0.8 });
+      ctx.restore();
+      return;
+    }
     ctx.save(); ctx.translate(cx, cy); ctx.rotate(time * 0.5);
     ctx.setLineDash([r * 0.07, r * 0.09]); ctx.lineWidth = r * 0.025; ctx.strokeStyle = C.violet;
     ctx.beginPath(); ctx.arc(0, 0, r * 1.14, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
-    const g = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
-    g.addColorStop(0, C.royal); g.addColorStop(1, C.deep);
     ctx.shadowColor = 'rgba(0,0,0,.4)'; ctx.shadowBlur = r * 0.4; ctx.shadowOffsetY = r * 0.12;
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+    ctx.beginPath();
+    if (shape === 'burst') {
+      for (let i = 0; i < 32; i++) { const a = (i / 32) * Math.PI * 2 + time * 0.15, rr = i % 2 ? r * 0.9 : r * 1.04; ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
+      ctx.closePath();
+    } else {
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    }
+    ctx.fillStyle = g; ctx.fill();
     ctx.shadowColor = 'transparent';
     ctx.lineWidth = r * 0.02; ctx.strokeStyle = 'rgba(255,255,255,.35)';
-    ctx.beginPath(); ctx.arc(cx, cy, r * 0.88, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.8, 0, Math.PI * 2); ctx.stroke();
     txt(ctx, 'ONLY', cx, cy - r * 0.4, { f: F.body, w: 600, s: r * 0.2, ls: r * 0.04, c: C.lav });
     txt(ctx, t.currency || 'Rs.', cx, cy - r * 0.08, { f: F.sans, w: 800, s: r * 0.27, c: '#fff' });
-    txt(ctx, t.price, cx, cy + r * 0.46, { f: F.sans, w: 900, s: r * 0.6, c: '#fff', max: r * 1.6 });
+    txt(ctx, t.price, cx, cy + r * 0.46, { f: F.sans, w: 900, s: r * 0.6, c: '#fff', max: r * 1.5 });
     ctx.restore();
+  }
+
+  // ---------- Looks: every render can pick a different one ----------
+  const LOOKS = {
+    elegant: { transition: ['sweep', 'iris'], text: ['rise'], hero: ['arch', 'circle'], wide: ['round'], badge: ['circle', 'burst'], particles: ['bokeh', 'leaves'], pace: 1 },
+    bold: { transition: ['slide', 'flash'], text: ['pop', 'slide'], hero: ['tilt', 'round'], wide: ['tilt', 'full'], badge: ['burst', 'ribbon'], particles: ['sparkle', 'bokeh'], pace: 0.95 },
+    energetic: { transition: ['flash', 'slide', 'iris'], text: ['pop', 'type'], hero: ['circle', 'tilt'], wide: ['full', 'tilt'], badge: ['burst'], particles: ['sparkle'], pace: 0.9 },
+    minimal: { transition: ['slide', 'sweep'], text: ['rise', 'slide'], hero: ['round', 'arch'], wide: ['round', 'full'], badge: ['circle', 'ribbon'], particles: ['none', 'leaves'], pace: 1 },
+  };
+  function variation(seed, preset = 'auto') {
+    const r = E.rng(seed || 1), pick = (arr) => arr[Math.floor(r() * arr.length) % arr.length];
+    const name = LOOKS[preset] ? preset : pick(Object.keys(LOOKS));
+    const L = LOOKS[name];
+    return {
+      seed, look: name,
+      transition: pick(L.transition), text: pick(L.text), hero: pick(L.hero), wide: pick(L.wide), badge: pick(L.badge), particles: pick(L.particles),
+      pace: L.pace, kb: r() < 0.5 ? 1 : -1, panX: r() * 2 - 1, darkHook: r() < 0.35, hookIndex: Math.floor(r() * 3), swapMiddle: r() < 0.4,
+      music: Math.floor(r() * 4), enhance: true,
+    };
+  }
+  const zoomFor = (S, p, strength = 0.14) => (S.v.kb > 0 ? lerp(1.02, 1 + strength, p) : lerp(1 + strength + 0.04, 1, ease.out(p)));
+  function hookText(S) {
+    const vars = (S.t.hookVariants || []).filter((h) => h && (h.lines || []).filter(Boolean).length >= 2);
+    if (vars.length && S.v.hookIndex !== undefined) {
+      const h = vars[S.v.hookIndex % vars.length];
+      return { lines: lines(h.lines), accent: h.accent || S.t.hookAccent, urdu: h.urdu || S.t.hookUrdu };
+    }
+    return { lines: lines(S.t.hook), accent: S.t.hookAccent, urdu: S.t.hookUrdu };
+  }
+  function heroFrame(ctx, S, x, y, w, h, o) {
+    const shape = S.v.hero || 'arch';
+    if (shape === 'arch') {
+      ctx.save(); ctx.globalAlpha *= o.alpha; ctx.strokeStyle = C.violet; ctx.lineWidth = 3; archPath(ctx, x - 24, y - 24, w, h); ctx.stroke(); ctx.restore();
+    }
+    card(ctx, S.media.hero, x, y, w, h, { ...o, shape, r: 48, tilt: -0.05, panX: S.v.panX });
   }
 
   function ctaButton(ctx, x, y, w, h, p, lt, label) {
@@ -158,15 +216,17 @@
     return {
       hook(ctx, k) {
         const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
-        bgLight(ctx, W, k.H, k.t);
-        logo(ctx, B, W / 2, 250, 92, C.purple, ease.out(a(0, 0.5)));
-        const hook = lines(t.hook).slice(0, 3), top = 700 + (3 - hook.length) * 70;
-        hook.forEach((s, i) => reveal(ctx, s, W / 2, top + i * 142, { f: F.sans, w: 900, s: 120, c: C.purple, ls: 2, max: 930 }, a(0.12 + i * 0.14, 0.7)));
+        const dark = S.v.darkHook, h0 = hookText(S);
+        const main = dark ? '#fff' : C.purple, accent = dark ? C.lav : C.violet, sub = dark ? C.lav : C.deep;
+        (dark ? bgDark : bgLight)(ctx, W, k.H, k.t);
+        logo(ctx, B, W / 2, 250, 92, main, ease.out(a(0, 0.5)));
+        const hook = h0.lines.slice(0, 3), top = 700 + (3 - hook.length) * 70;
+        hook.forEach((s, i) => reveal(ctx, s, W / 2, top + i * 142, { f: F.sans, w: 900, s: 120, c: main, ls: 2, max: 930 }, a(0.12 + i * 0.14, 0.7)));
         const ay = top + hook.length * 142 + 70;
-        reveal(ctx, t.hookAccent, W / 2, ay, { f: F.serif, w: 600, it: true, s: 210, c: C.violet, max: 960 }, a(0.6, 0.8));
+        reveal(ctx, h0.accent, W / 2, ay, { f: F.serif, w: 600, it: true, s: 210, c: accent, max: 960 }, a(0.6, 0.8));
         const uw = 560 * ease.out(a(1.0, 0.6));
-        if (uw > 1 && t.hookAccent) { ctx.strokeStyle = C.violet; ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(W / 2 - uw / 2, ay + 54); ctx.lineTo(W / 2 + uw / 2, ay + 54); ctx.stroke(); }
-        txt(ctx, t.hookUrdu, W / 2, ay + 204, { f: F.urdu, w: 600, s: 56, c: C.deep, alpha: ease.out(a(1.2, 0.6)), dir: 'rtl', max: 940 });
+        if (uw > 1 && h0.accent) { ctx.strokeStyle = accent; ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(W / 2 - uw / 2, ay + 54); ctx.lineTo(W / 2 + uw / 2, ay + 54); ctx.stroke(); }
+        txt(ctx, h0.urdu, W / 2, ay + 204, { f: F.urdu, w: 600, s: 56, c: sub, alpha: ease.out(a(1.2, 0.6)), dir: 'rtl', max: 940 });
         const pp = ease.out(a(0.9, 0.7));
         if (pp > 0 && M.thumb) {
           const r = 150, cx = W / 2, cy = 1640 + (1 - pp) * 120 + Math.sin(lt * 2.2) * 8;
@@ -186,15 +246,15 @@
         reveal(ctx, t.productLine1, W / 2, 455, { f: F.serif, w: 600, it: true, s: 170, c: C.purple, max: 960 }, a(0.1, 0.7));
         reveal(ctx, t.productLine2, W / 2, 580, { f: F.sans, w: 900, s: 112, ls: 8, c: C.purple, max: 960 }, a(0.25, 0.7));
         const ap = ease.out(a(0.2, 0.9)), x = 170, y = 660 + (1 - ap) * 160, w = 740, h = 925;
-        ctx.save(); ctx.globalAlpha *= ap; ctx.strokeStyle = C.violet; ctx.lineWidth = 3; archPath(ctx, x - 24, y - 24, w, h); ctx.stroke(); ctx.restore();
-        card(ctx, M.hero, x, y, w, h, { shape: 'arch', zoom: lerp(1.18, 1, ease.out(pr(lt, 0.2, 2.6))), alpha: ap, sweep: pr(lt, 1.4, 1.0) });
+        heroFrame(ctx, S, x, y, w, h, { zoom: zoomFor(S, pr(lt, 0.2, k.dur)), alpha: ap, sweep: pr(lt, 1.4, 1.0) });
         chipRow(ctx, t.introChips, W / 2, 1548, 76, 32, lt, 1.2, 0.15);
       },
       benefits(ctx, k) {
         const { W, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
         bgLight(ctx, W, k.H, k.t);
-        const ap = ease.out(a(0, 0.7));
-        card(ctx, M.wide, 90, 230 + (1 - ap) * 80, 900, 675, { r: 40, zoom: lerp(1.02, 1.12, pr(lt, 0, k.dur)), alpha: ap });
+        const ap = ease.out(a(0, 0.7)), wf = S.v.wide || 'round', z = zoomFor(S, pr(lt, 0, k.dur), 0.1);
+        if (wf === 'full') card(ctx, M.wide, 0, 0, W, 960, { shape: 'full', zoom: z, alpha: ap, panX: S.v.panX });
+        else card(ctx, M.wide, 90, 230 + (1 - ap) * 80, 900, 675, { shape: wf, r: 40, tilt: 0.04, zoom: z, alpha: ap, panX: S.v.panX });
         reveal(ctx, t.benefitsTitle, W / 2, 1030, { f: F.serif, w: 600, it: true, s: 104, c: C.purple, max: 940 }, a(0.3, 0.7));
         lines(t.benefits).slice(0, 4).forEach((b, i) => benefitChip(ctx, b, 130, 1092 + i * 120, 820, 98, a(0.65 + i * 0.42, 0.55)));
       },
@@ -218,7 +278,7 @@
         logo(ctx, B, W / 2, 200, 84, C.purple, ease.out(a(0, 0.5)));
         const ap = ease.out(a(0, 0.7));
         card(ctx, M.square, 250, 290 + (1 - ap) * 70, 640, 630, { r: 44, zoom: lerp(1.14, 1, ease.out(pr(lt, 0, 1.6))), alpha: ap, sweep: pr(lt, 1.7, 1.0) });
-        priceBadge(ctx, t, 255, 860, 150, a(0.35, 0.6), k.t);
+        priceBadge(ctx, t, 255, 860, 150, a(0.35, 0.6), k.t, S.v.badge);
         reveal(ctx, t.offerTitle, W / 2, 1075, { f: F.sans, w: 900, s: 96, ls: 2, c: C.purple, max: 920 }, a(0.6, 0.6));
         reveal(ctx, t.offerSub, W / 2, 1160, { f: F.serif, w: 600, it: true, s: 78, c: C.violet, max: 920 }, a(0.75, 0.6));
         txt(ctx, t.offerUrdu, W / 2, 1250, { f: F.urdu, w: 600, s: 46, c: C.deep, alpha: ease.out(a(0.95, 0.6)), dir: 'rtl', max: 940 });
@@ -298,19 +358,20 @@
     return {
       hook(ctx, k) {
         const { W, H, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
-        bgLight(ctx, W, H, k.t);
-        logo(ctx, B, 140, 140, 76, C.purple, ease.out(a(0, 0.5)), 'left');
-        const hook = lines(t.hook).slice(0, 3);
-        hook.forEach((s, i) => reveal(ctx, s, 140, 370 + i * 110, { f: F.sans, w: 900, s: 104, ls: 2, c: C.purple, a: 'left', max: 900 }, a(0.12 + i * 0.14, 0.7)));
+        const dark = S.v.darkHook, h0 = hookText(S);
+        const main = dark ? '#fff' : C.purple, accent = dark ? C.lav : C.violet, sub = dark ? C.lav : C.deep;
+        (dark ? bgDark : bgLight)(ctx, W, H, k.t);
+        logo(ctx, B, 140, 140, 76, main, ease.out(a(0, 0.5)), 'left');
+        const hook = h0.lines.slice(0, 3);
+        hook.forEach((s, i) => reveal(ctx, s, 140, 370 + i * 110, { f: F.sans, w: 900, s: 104, ls: 2, c: main, a: 'left', max: 900 }, a(0.12 + i * 0.14, 0.7)));
         const ay = 370 + hook.length * 110 + 70;
-        reveal(ctx, t.hookAccent, 140, ay, { f: F.serif, w: 600, it: true, s: 170, c: C.violet, a: 'left', max: 920 }, a(0.6, 0.8));
+        reveal(ctx, h0.accent, 140, ay, { f: F.serif, w: 600, it: true, s: 170, c: accent, a: 'left', max: 920 }, a(0.6, 0.8));
         const uw = 500 * ease.out(a(1.0, 0.6));
-        if (uw > 1 && t.hookAccent) { ctx.strokeStyle = C.violet; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(146, ay + 45); ctx.lineTo(146 + uw, ay + 45); ctx.stroke(); }
-        txt(ctx, t.hookUrdu, 146, Math.min(ay + 160, 1010), { f: F.urdu, w: 600, s: 48, c: C.deep, a: 'left', alpha: ease.out(a(1.2, 0.6)), max: 900 });
+        if (uw > 1 && h0.accent) { ctx.strokeStyle = accent; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(146, ay + 45); ctx.lineTo(146 + uw, ay + 45); ctx.stroke(); }
+        txt(ctx, h0.urdu, 146, Math.min(ay + 160, 1010), { f: F.urdu, w: 600, s: 48, c: sub, a: 'left', alpha: ease.out(a(1.2, 0.6)), max: 900 });
         const ap = ease.out(a(0.25, 0.9));
-        glow(ctx, 1480, 560, 560, 'rgba(255,255,255,1)', 0.9);
-        ctx.save(); ctx.globalAlpha *= ap; ctx.strokeStyle = C.violet; ctx.lineWidth = 3; archPath(ctx, 1160, 130 + (1 - ap) * 120, 640, 800); ctx.stroke(); ctx.restore();
-        card(ctx, M.hero, 1184, 154 + (1 - ap) * 120, 640, 800, { shape: 'arch', zoom: lerp(1.15, 1, ease.out(pr(lt, 0.25, 2.8))), alpha: ap, sweep: pr(lt, 1.6, 1.0) });
+        if (!dark) glow(ctx, 1480, 560, 560, 'rgba(255,255,255,1)', 0.9);
+        heroFrame(ctx, S, 1184, 154 + (1 - ap) * 120, 640, 800, { zoom: zoomFor(S, pr(lt, 0.25, k.dur)), alpha: ap, sweep: pr(lt, 1.6, 1.0) });
       },
       reveal(ctx, k) {
         const { W, H, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
@@ -328,8 +389,9 @@
       benefits(ctx, k) {
         const { W, H, lt } = k, a = (d, l = 0.6) => pr(lt, d, l);
         bgLight(ctx, W, H, k.t);
-        const ap = ease.out(a(0, 0.7));
-        card(ctx, M.wide, 120 + (1 - ap) * -60, 170, 880, 660, { r: 40, zoom: lerp(1.02, 1.12, pr(lt, 0, k.dur)), alpha: ap });
+        const ap = ease.out(a(0, 0.7)), wf = S.v.wide || 'round', z = zoomFor(S, pr(lt, 0, k.dur), 0.1);
+        if (wf === 'full') card(ctx, M.wide, 0, 0, 1020, H, { shape: 'full', zoom: z, alpha: ap, panX: S.v.panX });
+        else card(ctx, M.wide, 120 + (1 - ap) * -60, 170, 880, 660, { shape: wf, r: 40, tilt: -0.035, zoom: z, alpha: ap, panX: S.v.panX });
         reveal(ctx, t.benefitsTitle, 1100, 300, { f: F.serif, w: 600, it: true, s: 96, c: C.purple, a: 'left', max: 720 }, a(0.3, 0.7));
         lines(t.benefits).slice(0, 4).forEach((b, i) => benefitChip(ctx, b, 1100, 360 + i * 122, 700, 96, a(0.65 + i * 0.42, 0.55)));
       },
@@ -352,7 +414,7 @@
         bgLight(ctx, W, H, k.t);
         const ap = ease.out(a(0, 0.7));
         card(ctx, M.square, 200, 160 + (1 - ap) * 60, 660, 650, { r: 44, zoom: lerp(1.14, 1, ease.out(pr(lt, 0, 1.6))), alpha: ap, sweep: pr(lt, 1.7, 1.0) });
-        priceBadge(ctx, t, 225, 760, 140, a(0.35, 0.6), k.t);
+        priceBadge(ctx, t, 225, 760, 140, a(0.35, 0.6), k.t, S.v.badge);
         const cx = 1360;
         logo(ctx, B, cx, 175, 70, C.purple, ease.out(a(0, 0.5)));
         reveal(ctx, t.offerTitle, cx, 360, { f: F.sans, w: 900, s: 100, ls: 2, c: C.purple, max: 940 }, a(0.6, 0.6));
@@ -386,15 +448,23 @@
   function build(format, S) {
     const isWide = format === 'landscape';
     const W = isWide ? 1920 : 1080, H = isWide ? 1080 : 1920;
+    S = { ...S, v: S.v || variation(1, 'elegant') };
     const draw = isWide ? landscapeScenes(S) : portraitScenes(S);
+    // Some looks swap the two middle scenes so the story order changes too.
+    const plan = PLANS[format].map((p) => p.slice());
+    if (S.v.swapMiddle) {
+      const [a, b] = format === 'footage' ? ['inside', 'nothing'] : ['benefits', 'ingredients'];
+      const i = plan.findIndex((p) => p[0] === a), j = plan.findIndex((p) => p[0] === b);
+      if (i > -1 && j > -1) [plan[i], plan[j]] = [plan[j], plan[i]];
+    }
     let at = 0;
     const scenes = [], voices = [], pop = [];
-    PLANS[format].forEach(([name, base, voiceKey, clipRole]) => {
+    plan.forEach(([name, base, voiceKey, clipRole]) => {
       if (!available(format, name, S)) return;
       const key = voiceKey || name;
       const vd = S.voiceDur[key] || 0;
       const lead = scenes.length ? 0.3 : 0.15;
-      const len = Math.max(base, vd ? vd + lead + 0.5 : 0);
+      const len = Math.max(base * (S.v.pace || 1), vd ? vd + lead + 0.5 : 0);
       const clip = clipRole && S.media[clipRole] && S.media[clipRole].el.tagName === 'VIDEO' ? S.media[clipRole] : null;
       scenes.push({ name, from: at, to: at + len, draw: draw[name], clip });
       if (vd) voices.push({ key, at: at + lead });
@@ -405,8 +475,9 @@
     });
     const offer = scenes[scenes.length - 1];
     return {
-      format, w: W, h: H, duration: at, scenes, voices,
+      format, w: W, h: H, duration: at, scenes, voices, v: S.v,
       cues: {
+        style: S.v.music,
         drop: scenes[1] ? scenes[1].from : 0,
         whoosh: scenes.slice(1).map((s) => s.from),
         hit: [offer.from + 0.35],
@@ -415,5 +486,5 @@
     };
   }
 
-  window.AdTemplates = { build, PLANS, available };
+  window.AdTemplates = { build, PLANS, available, variation, LOOKS };
 })();

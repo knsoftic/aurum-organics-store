@@ -101,6 +101,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::put('{adProject}', 'update')->name('update');
             Route::delete('{adProject}', 'destroy')->name('destroy');
             Route::post('{adProject}/regenerate', 'regenerate')->name('regenerate');
+            Route::post('{adProject}/ai-script', 'aiScript')->name('ai-script');
             Route::post('{adProject}/media', 'uploadMedia')->name('media');
             Route::post('{adProject}/tts', 'tts')->name('tts');
             Route::post('{adProject}/voice', 'voiceUpload')->name('voice');

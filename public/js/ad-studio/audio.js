@@ -31,7 +31,7 @@
   }
 
   async function renderSoundtrack(duration, cues, voices = [], opts = {}) {
-    cues = Object.assign({ whoosh: [], pop: [], hit: [], drop: 0 }, cues || {});
+    cues = Object.assign({ whoosh: [], pop: [], hit: [], drop: 0, style: 0 }, cues || {});
     const musicOn = opts.music !== false;
     const volume = opts.volume ?? 0.8;
     const ctx = new OfflineAudioContext(2, Math.ceil(SR * duration), SR);
@@ -82,9 +82,16 @@
     const reverb = ctx.createConvolver(); reverb.buffer = impulse(ctx, 2.4, 2.6);
     const wet = ctx.createGain(); wet.gain.value = 0.28; reverb.connect(wet).connect(master);
     const noise = noiseBuffer(ctx, 2);
-    const bpm = 100, beat = 60 / bpm, bar = beat * 4;
-    const prog = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]];
-    const bass = [45, 41, 48, 43];
+    // Four moods; the video's look picks one so the soundtrack changes with the visuals.
+    const MOODS = [
+      { bpm: 100, prog: [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]], bass: [45, 41, 48, 43] }, // Am F C G — warm
+      { bpm: 108, prog: [[48, 52, 55], [55, 59, 62], [57, 60, 64], [53, 57, 60]], bass: [36, 43, 45, 41] }, // C G Am F — uplifting
+      { bpm: 92, prog: [[50, 53, 57], [46, 50, 53], [53, 57, 60], [48, 52, 55]], bass: [38, 34, 41, 36] }, // Dm Bb F C — elegant
+      { bpm: 116, prog: [[52, 55, 59], [48, 52, 55], [55, 59, 62], [50, 54, 57]], bass: [40, 36, 43, 38] }, // Em C G D — energetic
+    ];
+    const mood = MOODS[(cues.style || 0) % MOODS.length];
+    const bpm = mood.bpm, beat = 60 / bpm, bar = beat * 4;
+    const prog = mood.prog, bass = mood.bass;
 
     function pad(notes, start, len) {
       const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1100; lp.Q.value = 0.4;

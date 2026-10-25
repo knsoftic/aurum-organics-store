@@ -93,6 +93,16 @@ class AdScriptGenerator
                 'hook' => $isHair ? ['STRONGER,', 'SHINIER HAIR', 'STARTS AT'] : ['PURE.', 'NATURAL.', 'MADE WITH'],
                 'hookAccent' => $isHair ? 'the roots.' : 'care.',
                 'hookUrdu' => $isHair ? 'مضبوط بالوں کا راز — صحت مند جڑیں' : 'قدرتی اجزاء، بہترین معیار',
+                // Picked at random per render so every video opens differently.
+                'hookVariants' => $isHair ? [
+                    ['lines' => ['STRONGER,', 'SHINIER HAIR', 'STARTS AT'], 'accent' => 'the roots.', 'urdu' => 'مضبوط بالوں کا راز — صحت مند جڑیں'],
+                    ['lines' => ['NOURISH.', 'STRENGTHEN.', 'SHINE.'], 'accent' => 'naturally.', 'urdu' => 'قدرتی جڑی بوٹیوں کی طاقت'],
+                    ['lines' => ['YOUR DAILY', 'DOSE OF', 'NATURE'], 'accent' => 'for hair.', 'urdu' => 'روزانہ کی قدرتی دیکھ بھال'],
+                ] : [
+                    ['lines' => ['PURE.', 'NATURAL.', 'MADE WITH'], 'accent' => 'care.', 'urdu' => 'قدرتی اجزاء، بہترین معیار'],
+                    ['lines' => ['NATURE’S', 'BEST, IN', 'EVERY DROP'], 'accent' => 'for you.', 'urdu' => 'ہر قطرے میں قدرت'],
+                    ['lines' => ['FEEL THE', 'DIFFERENCE', 'EVERY DAY'], 'accent' => 'naturally.', 'urdu' => 'ہر دن، قدرتی احساس'],
+                ],
                 'intro' => 'INTRODUCING',
                 'introChips' => array_values(array_filter([$product->size_label, $isHair ? 'Men & Women' : null, $isHair ? 'All hair types' : null])),
                 'benefitsTitle' => 'Why you’ll love it',
@@ -126,7 +136,7 @@ class AdScriptGenerator
             ],
             'voice' => [
                 'mode' => 'none',
-                'voice' => 'ur-PK-UzmaNeural',
+                'voice' => null,
                 'rate' => 0,
                 'lines' => [
                     'hook' => $isHair ? 'مضبوط اور چمکدار بالوں کا راز… صحت مند جڑیں۔' : 'قدرتی اجزاء، اور بہترین معیار۔',

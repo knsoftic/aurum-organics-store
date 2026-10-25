@@ -52,12 +52,13 @@
         <div class="card">
             <div class="card-head"><h3>Urdu voice</h3></div>
             <div class="card-body" style="font-size:13px;display:grid;gap:8px">
-                @if ($ttsReady)
-                    <div class="alert alert-success" style="margin:0">Azure AI Speech is connected — realistic Urdu voices are available.</div>
+                @if ($ttsProvider)
+                    <div class="alert alert-success" style="margin:0">AI voice connected: <strong>{{ \App\Services\Tts\TtsManager::PROVIDERS[$ttsProvider] }}</strong>.</div>
                 @else
                     <div class="alert alert-info" style="margin:0">No voice API connected. You can still <strong>record your own voice</strong> in the studio or upload an audio file.</div>
-                    <p class="muted" style="margin:0">For realistic AI Urdu voices (Uzma / Asad), add a free Azure Speech key in <a href="{{ route('admin.settings.edit') }}#integrations" style="text-decoration:underline">Settings → Integrations</a>.</p>
+                    <p class="muted" style="margin:0">For AI Urdu voices add a <strong>free Google Gemini key</strong> (or an OpenAI key for the openai.fm voices) in <a href="{{ route('admin.settings.edit') }}#integrations" style="text-decoration:underline">Settings → Integrations</a>.</p>
                 @endif
+                <p class="muted" style="margin:0">AI script writer: {{ $aiProvider ? 'on ('.ucfirst($aiProvider).')' : 'off — scripts are written from the product data' }}.</p>
             </div>
         </div>
     </div>

@@ -22,13 +22,6 @@ class AdProject extends Model
         'offer' => 'Price & offer',
     ];
 
-    public const VOICES = [
-        'ur-PK-UzmaNeural' => 'Uzma — Urdu (Pakistan), female',
-        'ur-PK-AsadNeural' => 'Asad — Urdu (Pakistan), male',
-        'ur-IN-GulNeural' => 'Gul — Urdu (India), female',
-        'ur-IN-SalmanNeural' => 'Salman — Urdu (India), male',
-    ];
-
     protected $fillable = ['title', 'product_id', 'config'];
 
     protected function casts(): array

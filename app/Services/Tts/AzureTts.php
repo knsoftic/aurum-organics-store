@@ -2,38 +2,19 @@
 
 namespace App\Services\Tts;
 
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 /**
- * Microsoft Azure AI Speech — neural text-to-speech (realistic Urdu voices such as
- * ur-PK-UzmaNeural / ur-PK-AsadNeural). Free tier: 0.5M characters per month.
- * Key + region are set in Admin → Settings → Integrations.
+ * Microsoft Azure AI Speech — neural Urdu voices (ur-PK-UzmaNeural / ur-PK-AsadNeural).
  */
-class AzureTts
+class AzureTts implements TtsProvider
 {
     public function __construct(protected string $key, protected string $region)
     {
     }
 
-    public static function fromSettings(): ?self
-    {
-        $encrypted = setting('azure_speech_key');
-        $region = trim((string) setting('azure_speech_region'));
-        if (setting('tts_provider') !== 'azure' || ! $encrypted || $region === '') {
-            return null;
-        }
-
-        try {
-            return new self(Crypt::decryptString($encrypted), $region);
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    /** Returns MP3 bytes. $rate is a percentage, e.g. -10 (slower) … +20 (faster). */
-    public function synthesize(string $text, string $voice, int $rate = 0): string
+    public function synthesize(string $text, string $voice, string $style, int $rate = 0): array
     {
         $lang = substr($voice, 0, 5);
         $ssml = sprintf(
@@ -58,6 +39,6 @@ class AzureTts
             });
         }
 
-        return $response->body();
+        return [$response->body(), 'mp3'];
     }
 }

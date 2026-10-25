@@ -15,6 +15,10 @@
   };
   function setPalette(p) { Object.assign(C, p || {}); }
 
+  // Look of the current video (see AdTemplates.variation): transitions, text motion, particles…
+  const V = { transition: 'sweep', text: 'rise', particles: 'bokeh', enhance: true };
+  function setVariation(v) { Object.assign(V, { transition: 'sweep', text: 'rise', particles: 'bokeh', enhance: true }, v || {}); }
+
   // ---------- Math / easing ----------
   const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -69,12 +73,29 @@
   }
   function measure(ctx, s, o) { ctx.save(); ctx.font = font(o); ctx.letterSpacing = (o.ls || 0) + 'px'; const w = ctx.measureText(s || '').width; ctx.restore(); return w; }
 
+  // Animated text entrance; style depends on the video's look (V.text).
   function reveal(ctx, s, x, y, o, p) {
     if (!s) return;
-    const e = ease.out(clamp(p));
+    p = clamp(p);
+    const e = ease.out(p), alpha = (o.alpha ?? 1) * clamp(p * 2.5);
     ctx.save();
-    ctx.beginPath(); ctx.rect(0, y - o.s * 1.1, ctx.canvas.width, o.s * 1.45); ctx.clip();
-    txt(ctx, s, x, y + (1 - e) * o.s * 1.25, { ...o, alpha: (o.alpha ?? 1) * clamp(p * 2.5) });
+    if (V.text === 'slide') {
+      txt(ctx, s, x - (1 - e) * o.s * 1.4, y, { ...o, alpha });
+    } else if (V.text === 'pop') {
+      const k = lerp(0.55, 1, ease.back(p));
+      ctx.translate(x, y - o.s * 0.35); ctx.scale(k, k); ctx.translate(-x, -(y - o.s * 0.35));
+      txt(ctx, s, x, y, { ...o, alpha });
+    } else if (V.text === 'type' && o.dir !== 'rtl') {
+      // Lay out the full line first so the text does not shift while it types out.
+      let style = o, full = measure(ctx, s, o);
+      if (o.max && full > o.max) { style = { ...o, s: o.s * o.max / full }; full = o.max; }
+      const chars = Array.from(String(s)), part = chars.slice(0, Math.ceil(chars.length * clamp(p * 1.4))).join('');
+      const align = o.a || 'center', left = align === 'center' ? x - full / 2 : align === 'right' ? x - full : x;
+      txt(ctx, part, left, y, { ...style, a: 'left', max: undefined, alpha: Math.min(1, (o.alpha ?? 1) * clamp(p * 6)) });
+    } else {
+      ctx.beginPath(); ctx.rect(0, y - o.s * 1.1, ctx.canvas.width, o.s * 1.45); ctx.clip();
+      txt(ctx, s, x, y + (1 - e) * o.s * 1.25, { ...o, alpha });
+    }
     ctx.restore();
   }
 
@@ -99,23 +120,50 @@
     const scale = Math.max(w / sw, h / sh) * zoom;
     const cw = w / scale, ch = h / scale;
     const sx = clamp(fx * sw - cw / 2, 0, sw - cw), sy = clamp(fy * sh - ch / 2, 0, sh - ch);
+    ctx.save();
+    ctx.imageSmoothingQuality = 'high';
+    if (V.enhance) ctx.filter = 'contrast(1.06) saturate(1.1) brightness(1.02)';
     ctx.drawImage(src, sx, sy, cw, ch, x, y, w, h);
+    ctx.restore();
   }
 
+  // Photo/clip in a frame. Shapes: round, arch, circle, tilt (polaroid), full (soft-faded edge).
   function card(ctx, media, x, y, w, h, o = {}) {
     if (!media || !media.el) return;
-    const { r = 36, zoom = 1, shape = 'round', alpha = 1, shadow = true } = o;
+    const { r = 36, zoom = 1, alpha = 1, shadow = true } = o;
+    let shape = o.shape || 'round';
     ctx.save();
     ctx.globalAlpha *= alpha;
-    const path = () => (shape === 'arch' ? archPath(ctx, x, y, w, h) : rrPath(ctx, x, y, w, h, r));
-    if (shadow) {
+    if (shape === 'circle') { const d = Math.min(w, h); x += (w - d) / 2; y += (h - d) / 2; w = h = d; }
+    if (shape === 'tilt') {
+      ctx.translate(x + w / 2, y + h / 2); ctx.rotate(o.tilt ?? -0.06); ctx.translate(-(x + w / 2), -(y + h / 2));
+      const b = Math.min(w, h) * 0.035;
+      ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.3)'; ctx.shadowBlur = 60; ctx.shadowOffsetY = 30;
+      rrPath(ctx, x - b, y - b, w + b * 2, h + b * 3.2, 18); ctx.fillStyle = '#fff'; ctx.fill(); ctx.restore();
+      shape = 'round';
+    }
+    const path = () => {
+      if (shape === 'arch') archPath(ctx, x, y, w, h);
+      else if (shape === 'circle') { ctx.beginPath(); ctx.arc(x + w / 2, y + h / 2, w / 2, 0, Math.PI * 2); }
+      else rrPath(ctx, x, y, w, h, shape === 'full' ? 0 : (o.shape === 'tilt' ? 10 : r));
+    };
+    if (shadow && shape !== 'full' && o.shape !== 'tilt') {
       ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.28)'; ctx.shadowBlur = 70; ctx.shadowOffsetY = 34;
       path(); ctx.fillStyle = C.lavLight; ctx.fill(); ctx.restore();
     }
     path(); ctx.clip();
-    cover(ctx, media.el, x, y, w, h, zoom, media.fx ?? 0.5, media.fy ?? 0.5);
+    cover(ctx, media.el, x, y, w, h, zoom, (media.fx ?? 0.5) + (o.panX || 0) * 0.06, media.fy ?? 0.5);
+    if (shape === 'full') {
+      const g = ctx.createLinearGradient(0, y + h * 0.62, 0, y + h);
+      g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, C.bg2);
+      ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+    }
     if (o.sweep !== undefined) sweepLight(ctx, x, y, w, h, o.sweep);
     ctx.restore();
+    if (shape === 'circle' && alpha > 0) {
+      ctx.save(); ctx.globalAlpha *= alpha; ctx.strokeStyle = C.violet; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(x + w / 2, y + h / 2, w / 2 + 18, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
   }
 
   function sweepLight(ctx, x, y, w, h, p) {
@@ -182,7 +230,23 @@
   }
   function particles(ctx, W, H, t, dark) {
     const unit = Math.min(W, H);
+    if (V.particles === 'none') return;
+    if (V.particles === 'sparkle') {
+      PARTS.forEach((p) => {
+        const tw = 0.5 + 0.5 * Math.sin(t * (2 + p.sp * 3) + p.ph * 3);
+        const x = (p.x + Math.sin(t * 0.2 + p.ph) * 0.01) * W, y = ((p.y - t * 0.012 * p.sp) % 1 + 1) % 1 * H;
+        const s = (6 + p.s * 14) * unit / 1080 * (0.4 + tw * 0.6);
+        ctx.save(); ctx.globalAlpha = (dark ? 0.7 : 0.55) * tw; ctx.fillStyle = dark ? '#fff' : C.violet;
+        ctx.translate(x, y); ctx.rotate(p.ph);
+        ctx.beginPath();
+        for (let k = 0; k < 8; k++) { const rr = k % 2 ? s * 0.28 : s; const a = k * Math.PI / 4; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+        ctx.closePath(); ctx.fill(); ctx.restore();
+      });
+      return;
+    }
+    const onlyNature = V.particles === 'leaves';
     PARTS.forEach((p, i) => {
+      if (onlyNature && p.kind < 0.62) return;
       const y = ((p.y - t * 0.035 * p.sp) % 1 + 1) % 1;
       const x = p.x + Math.sin(t * 0.8 * p.sp + p.ph) * 0.02;
       const px = x * W, py = y * H;
@@ -206,10 +270,40 @@
     });
   }
 
-  // Two-tone diagonal sweep that hides each scene cut (full cover exactly at the cut).
+  // Scene-cut transitions; each fully covers the frame exactly at the cut.
   function transition(ctx, W, H, t, at) {
     const u = pr(t, at - 0.32, 0.64);
     if (u <= 0 || u >= 1) return;
+    if (V.transition === 'iris') {
+      const k = u < 0.5 ? ease.inOut(u * 2) : 1 - ease.inOut((u - 0.5) * 2);
+      const R = Math.hypot(W, H) / 2 * k;
+      ctx.save();
+      ctx.fillStyle = C.violet; ctx.beginPath(); ctx.arc(W / 2, H / 2, R * 1.08 + 1, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C.deep; ctx.beginPath(); ctx.arc(W / 2, H / 2, R, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      return;
+    }
+    if (V.transition === 'slide') {
+      const k = u < 0.5 ? ease.inOut(u * 2) : 1 - ease.inOut((u - 0.5) * 2);
+      const n = 4, colW = W / n;
+      ctx.save();
+      for (let i = 0; i < n; i++) {
+        const delay = i * 0.06, kk = clamp((k - delay) / (1 - 0.06 * (n - 1)));
+        const hh = H * ease.out(kk) * 1.02;
+        ctx.fillStyle = i % 2 ? C.deep : C.purple;
+        if (u < 0.5) ctx.fillRect(i * colW - 1, 0, colW + 2, hh); else ctx.fillRect(i * colW - 1, H - hh, colW + 2, hh);
+      }
+      ctx.restore();
+      return;
+    }
+    if (V.transition === 'flash') {
+      const k = 1 - Math.abs(u - 0.5) * 2;
+      ctx.save();
+      ctx.globalAlpha = ease.inOut(clamp(k * 1.25)); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = ease.inOut(clamp(k * 1.6 - 0.6)) * 0.35; ctx.fillStyle = C.lav; ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+      return;
+    }
     const skew = Math.min(W, H) * 0.25;
     [[C.violet, 0.07], [C.deep, 0]].forEach(([color, lead]) => {
       const x = lerp(-W * 2.3, W * 2.3, ease.inOut(clamp(u + lead)));
@@ -222,6 +316,7 @@
 
   // ---------- Runner ----------
   async function drawFrame(ctx, comp, t, seekVideos = true) {
+    if (comp.v) setVariation(comp.v);
     const scene = comp.scenes.find((s) => t >= s.from && t < s.to) || comp.scenes[comp.scenes.length - 1];
     const lt = t - scene.from;
     if (seekVideos && scene.clip && scene.clip.el) {
@@ -284,7 +379,7 @@
   }
 
   window.AdEngine = {
-    FPS, C, F, setPalette, clamp, lerp, ease, pr, txt, reveal, measure, rrPath, archPath, cover, card, sweepLight, glow,
+    FPS, C, F, V, rng, setPalette, setVariation, clamp, lerp, ease, pr, txt, reveal, measure, rrPath, archPath, cover, card, sweepLight, glow,
     pill, checkIcon, crossIcon, logo, bgLight, bgDark, loadImage, loadVideo, seek, drawFrame, renderMp4,
   };
 })();

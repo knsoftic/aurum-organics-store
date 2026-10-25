@@ -19,9 +19,15 @@
     c.formats = c.formats || ['motion', 'footage', 'landscape'];
     c.music = c.music || { enabled: true, volume: 0.8 };
     c.voice = c.voice || {}; c.voice.lines = c.voice.lines || {}; c.voice.clips = Array.isArray(c.voice.clips) ? {} : (c.voice.clips || {});
-    c.voice.mode = c.voice.mode || 'none'; c.voice.voice = c.voice.voice || Object.keys(S.voices)[0]; c.voice.rate = c.voice.rate || 0;
+    c.voice.mode = c.voice.mode || 'none'; c.voice.rate = c.voice.rate || 0;
+    if (!S.voices[c.voice.voice]) c.voice.voice = Object.keys(S.voices)[0] || null;
+    if (c.voice.mode === 'tts' && !S.ttsReady) c.voice.mode = 'none';
     c.text = c.text || {};
+    c.meta = Array.isArray(c.meta) || !c.meta ? {} : c.meta;
+    c.style = c.style || { preset: 'auto', fresh: true, seed: newSeed() };
   })();
+  function newSeed() { return Math.floor(Math.random() * 1e9) + 1; }
+  const LOOK_NAMES = { auto: 'Surprise me (random)', elegant: 'Elegant', bold: 'Bold', energetic: 'Energetic', minimal: 'Minimal' };
 
   // ---------- Server ----------
   async function api(endpoint, opts = {}) {
@@ -194,10 +200,12 @@
   function renderScript() {
     const t = cfg().text;
     panel('script').innerHTML = `
-      <div class="flex between wrap" style="margin-bottom:14px">
-        <p class="muted" style="margin:0;font-size:13px">Written automatically from the product's details. Edit anything — the preview updates live.</p>
-        <button type="button" class="btn btn-light btn-sm" data-regenerate>↻ Rewrite from product data</button>
+      <div class="flex between wrap" style="margin-bottom:14px;gap:10px">
+        <p class="muted" style="margin:0;font-size:13px;flex:1;min-width:240px">${cfg().meta.aiWrittenAt ? 'Written by AI (' + esc(S.aiProvider || '') + ') — every click writes a new version.' : 'Written automatically from the product details.'} Edit anything — the preview updates live.</p>
+        <button type="button" class="btn btn-gold btn-sm" data-ai ${S.aiProvider ? '' : 'disabled title="Add a Gemini (free) or OpenAI key in Settings → Integrations"'}>✨ New script with AI</button>
+        <button type="button" class="btn btn-light btn-sm" data-regenerate>↻ From product data</button>
       </div>
+      ${S.aiProvider ? '' : `<div class="alert alert-info" style="font-size:12.5px">Want a fresh, different script for every ad? Add a free <strong>Google Gemini</strong> key in <a href="${S.settingsUrl}" style="text-decoration:underline">Settings → Integrations</a>.</div>`}
       ${SCRIPT.map(([title, fields]) => `<div class="script-group"><strong>${title}</strong><div class="form-grid">
         ${fields.map(([key, label, type]) => {
           const wide = type === 'lines' || type === 'pairs' || type === 'urdu';
@@ -216,7 +224,18 @@
         : type === 'number' ? (parseInt(v, 10) || 0) : v;
     dirty();
   });
+  async function aiScript(btn) {
+    if (btn) { btn.disabled = true; btn.textContent = '✨ Writing…'; }
+    busy(true, 'AI is writing a new script…');
+    try {
+      const res = await api(S.routes.aiScript);
+      state.config.text = res.config.text; state.config.voice.lines = res.config.voice.lines; state.config.meta = res.config.meta || {};
+      renderScript(); if (!panel('voice').hidden) renderVoice();
+      toast('New script written — check the Urdu voice lines in step 3.');
+    } catch (err) { toast(err.message, true); renderScript(); } finally { busy(false); schedulePreview(); }
+  }
   panel('script').addEventListener('click', async (e) => {
+    if (e.target.closest('[data-ai]')) { aiScript(e.target.closest('[data-ai]')); return; }
     if (!e.target.closest('[data-regenerate]')) return;
     if (!confirm('Replace all text and Urdu voice lines with a fresh version from the product data?')) return;
     try { const res = await api(S.routes.regenerate); state.config.text = res.config.text; state.config.voice.lines = res.config.voice.lines; renderScript(); schedulePreview(); toast('Script rewritten.'); } catch (err) { toast(err.message, true); }
@@ -238,7 +257,7 @@
 
   function renderVoice() {
     const v = cfg().voice;
-    const modes = [['none', 'No voice — music only'], ['tts', 'AI Urdu voice (Azure)' + (S.ttsReady ? '' : ' — not connected')], ['record', 'Record my own voice'], ['upload', 'Upload audio files']];
+    const modes = [['none', 'No voice — music only'], ['tts', S.ttsReady ? 'AI Urdu voice — ' + S.ttsLabel : 'AI Urdu voice — not connected'], ['record', 'Record my own voice'], ['upload', 'Upload audio files']];
     panel('voice').innerHTML = `
       <div class="form-grid" style="margin-bottom:14px">
         <div class="field"><label>Voice-over</label><select class="select" data-vmode>${modes.map(([k, l]) => `<option value="${k}" ${v.mode === k ? 'selected' : ''} ${k === 'tts' && !S.ttsReady ? 'disabled' : ''}>${l}</option>`).join('')}</select></div>
@@ -246,7 +265,8 @@
         <div class="field"><label>Speed: <span data-vrate-label>${v.rate > 0 ? '+' : ''}${v.rate}%</span></label><input type="range" min="-20" max="20" step="5" value="${v.rate}" data-vrate style="width:100%;accent-color:var(--gold)"></div>
         <div class="field" style="align-self:end"><button type="button" class="btn btn-gold btn-sm" data-vall>Generate all lines</button></div>` : ''}
       </div>
-      ${!S.ttsReady ? `<div class="alert alert-info" style="font-size:12.5px">Realistic AI Urdu voices need a free <strong>Azure Speech</strong> key — add it in <a href="${S.settingsUrl}" style="text-decoration:underline">Settings → Integrations</a>. Without it, record your own voice (each line is shown like a teleprompter) or upload audio.</div>` : ''}
+      ${!S.ttsReady ? `<div class="alert alert-info" style="font-size:12.5px">For AI Urdu voices add a <strong>free Google Gemini</strong> key (or an OpenAI key for the openai.fm voices) in <a href="${S.settingsUrl}" style="text-decoration:underline">Settings → Integrations</a>. Without it, record your own voice (each line is shown like a teleprompter) or upload audio.</div>` : ''}
+      ${v.mode === 'tts' && S.ttsProvider === 'gemini' ? '<p class="muted" style="font-size:12.5px;margin:0 0 12px">Tip: Urdu is not on Google’s official voice list — listen to one line before generating all. If it sounds off, try another voice or OpenAI.</p>' : ''}
       ${v.mode === 'none' ? '<p class="muted" style="font-size:13px">Videos will have background music only. Choose a voice option above to add an Urdu voice-over.</p>' : ''}
       ${voiceKeys().map((key) => {
         const clip = v.clips[key];
@@ -339,6 +359,13 @@
         return `<label class="format-check ${disabled ? 'disabled' : ''}"><input type="checkbox" data-format="${k}" ${c.formats.includes(k) && !disabled ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
           <span><strong>${f.label}</strong><small>${f.ratio} · ${f.w}×${f.h}${disabled ? ' · needs at least one product video' : k === 'landscape' ? ' · Facebook / Instagram feed, YouTube' : ' · TikTok, Reels, Stories'}</small></span></label>`;
       }).join('')}
+      <h4>Look &amp; motion</h4>
+      <div class="flex wrap" style="gap:18px">
+        <label class="flex" style="font-size:13px">Style
+          <select class="select" data-preset style="width:auto">${Object.entries(LOOK_NAMES).map(([k, l]) => `<option value="${k}" ${c.style.preset === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label class="switch"><input type="checkbox" data-fresh ${c.style.fresh ? 'checked' : ''}><span class="track"></span> New look for every video (transitions, text motion, frames, music)</label>
+      </div>
+      <p class="muted" style="font-size:12.5px;margin:6px 0 0">Turn this off to render exactly the look shown in the preview (use “Shuffle look” there to try others).</p>
       <h4>Sound</h4>
       <div class="flex wrap" style="gap:18px">
         <label class="switch"><input type="checkbox" data-music ${c.music.enabled ? 'checked' : ''}><span class="track"></span> Background music</label>
@@ -356,6 +383,8 @@
     const c = cfg(), el = e.target;
     if (el.dataset.format) { c.formats = Object.keys(S.formats).filter((k) => $(`[data-format="${k}"]`, panel('render'))?.checked); dirty(false); fillPreviewSelect(); }
     if (el.matches('[data-music]')) { c.music.enabled = el.checked; dirty(false); }
+    if (el.matches('[data-preset]')) { c.style.preset = el.value; c.style.seed = newSeed(); dirty(); }
+    if (el.matches('[data-fresh]')) { c.style.fresh = el.checked; dirty(false); }
     if (el.matches('[data-volume]')) { c.music.volume = parseFloat(el.value); dirty(false); }
   });
   panel('render').addEventListener('click', (e) => { if (e.target.closest('[data-render]')) renderAll(e.target.closest('[data-render]')); });
@@ -371,13 +400,15 @@
       const spec = await buildSpec();
       for (let i = 0; i < formats.length; i++) {
         const f = formats[i], label = S.formats[f].label, step = (p, msg) => { bar.style.width = Math.round(((i + p) / formats.length) * 100) + '%'; text.textContent = `${label} (${i + 1}/${formats.length}) — ${msg}`; };
-        const comp = T.build(f, spec);
-        step(0.01, 'Mixing music and voice…');
+        const seed = c.style.fresh ? newSeed() : c.style.seed;
+        const comp = T.build(f, { ...spec, v: T.variation(seed, c.style.preset) });
+        step(0.01, `“${LOOK_NAMES[comp.v.look]}” look · mixing music and voice…`);
         const voices = comp.voices.filter((v) => spec.buffers[v.key]).map((v) => ({ buffer: spec.buffers[v.key], at: v.at }));
         const audio = await AU.renderSoundtrack(comp.duration, comp.cues, voices, { music: c.music.enabled, volume: c.music.volume });
         const mp4 = await E.renderMp4($('#renderCanvas'), comp, audio, (p, m) => step(p * 0.9, m));
         step(0.92, 'Uploading…');
         const render = await uploadRender(mp4, f, comp.duration, voices.length > 0, (p) => step(0.92 + p * 0.08, 'Uploading ' + Math.round(p * 100) + '%'));
+        render.label += ' · ' + LOOK_NAMES[comp.v.look];
         state.renders.unshift(render); renderList();
       }
       bar.style.width = '100%'; text.textContent = 'Done! Your videos are ready in "Rendered videos".';
@@ -447,7 +478,7 @@
         try { const b = await voiceBuffer(clip.path); bufs[key] = b; voiceDur[key] = b.duration; } catch (e) { console.warn(e); }
       }
     }
-    return { brand, t: c.text, media, voiceDur, buffers: bufs };
+    return { brand, t: c.text, media, voiceDur, buffers: bufs, v: T.variation(c.style.seed, c.style.preset) };
   }
 
   const pCanvas = $('#previewCanvas'), pCtx = pCanvas.getContext('2d');
@@ -466,6 +497,8 @@
       const spec = await buildSpec();
       previewComp = T.build($('#previewFormat').value, spec);
       pCanvas.width = previewComp.w; pCanvas.height = previewComp.h;
+      const v = previewComp.v;
+      $('#previewLook').textContent = `${LOOK_NAMES[v.look]} · ${v.transition} transition · ${v.text} text · ${v.hero} photo · ${v.badge} badge`;
       const slider = $('#previewTime'); slider.max = previewComp.duration.toFixed(2);
       await drawPreview(Math.min(parseFloat(slider.value) || 0, previewComp.duration - 0.05));
       busy(false);
@@ -477,6 +510,7 @@
     $('#previewClock').textContent = t.toFixed(1) + 's / ' + previewComp.duration.toFixed(1) + 's';
   }
   $('#previewFormat').addEventListener('change', rebuildPreview);
+  $('#previewShuffle').addEventListener('click', () => { cfg().style.seed = newSeed(); dirty(); });
   $('#previewTime').addEventListener('input', (e) => { playing = false; drawPreview(parseFloat(e.target.value)); });
   $('#previewPlay').addEventListener('click', async () => {
     if (playing) { playing = false; return; }
@@ -513,6 +547,8 @@
     const stale = [...c.media.images, ...c.media.videos].some((m) => m.enabled && !known.has(m.path));
     if (stale && c.media.images.length) await runAnalysis();
     await rebuildPreview();
+    // First visit with an AI key: write a fresh script automatically.
+    if (S.aiProvider && !c.meta.aiWrittenAt) await aiScript(null);
     window.__studioReady = true;
   })();
 })();

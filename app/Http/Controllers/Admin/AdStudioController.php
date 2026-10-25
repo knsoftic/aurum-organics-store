@@ -8,7 +8,8 @@ use App\Models\AdProject;
 use App\Models\AdRender;
 use App\Models\Product;
 use App\Services\AdScriptGenerator;
-use App\Services\Tts\AzureTts;
+use App\Services\AiScriptWriter;
+use App\Services\Tts\TtsManager;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
@@ -24,7 +25,8 @@ class AdStudioController extends Controller
         return view('admin.ad-studio.index', [
             'projects' => AdProject::with(['product', 'renders'])->latest()->get(),
             'products' => Product::orderByDesc('is_active')->orderBy('name')->get(['id', 'name']),
-            'ttsReady' => AzureTts::fromSettings() !== null,
+            'ttsProvider' => TtsManager::provider(),
+            'aiProvider' => AiScriptWriter::provider(),
         ]);
     }
 
@@ -49,7 +51,8 @@ class AdStudioController extends Controller
     {
         return view('admin.ad-studio.studio', [
             'project' => $adProject->load(['product', 'renders']),
-            'ttsReady' => AzureTts::fromSettings() !== null,
+            'ttsProvider' => TtsManager::provider(),
+            'aiProvider' => AiScriptWriter::provider(),
         ]);
     }
 
@@ -107,31 +110,45 @@ class AdStudioController extends Controller
         return response()->json(['added' => $added, 'media' => $config['media']]);
     }
 
-    /** Realistic Urdu voice for one scene through Azure neural TTS. */
+    /** AI Urdu voice for one scene (Gemini, OpenAI or Azure — Settings → Integrations). */
     public function tts(Request $request, AdProject $adProject)
     {
+        $provider = TtsManager::provider();
         $data = $request->validate([
             'key' => ['required', Rule::in(array_keys(AdProject::VOICE_KEYS))],
             'text' => 'required|string|max:1000',
-            'voice' => ['required', Rule::in(array_keys(AdProject::VOICES))],
+            'voice' => ['required', Rule::in(array_keys(TtsManager::voices($provider)))],
             'rate' => 'nullable|integer|min:-30|max:30',
         ]);
 
-        $tts = AzureTts::fromSettings();
+        $tts = TtsManager::make();
         if (! $tts) {
-            return response()->json(['message' => 'Add your Azure Speech key in Settings → Integrations first.'], 422);
+            return response()->json(['message' => 'Choose a voice provider and add its API key in Settings → Integrations first.'], 422);
         }
 
         try {
-            $audio = $tts->synthesize($data['text'], $data['voice'], (int) ($data['rate'] ?? 0));
+            [$audio, $ext] = $tts->synthesize($data['text'], $data['voice'], TtsManager::style(), (int) ($data['rate'] ?? 0));
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        $path = "ads/voice/{$adProject->id}/{$data['key']}-".Str::random(8).'.mp3';
+        $path = "ads/voice/{$adProject->id}/{$data['key']}-".Str::random(8).'.'.$ext;
         Storage::disk('uploads')->put($path, $audio);
 
         return response()->json($this->saveClip($adProject, $data['key'], $path, 'tts'));
+    }
+
+    /** Fresh English text + Urdu voice script written by AI (Gemini / OpenAI). */
+    public function aiScript(AdProject $adProject, AiScriptWriter $writer)
+    {
+        try {
+            $config = $writer->write($adProject->load('product'));
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+        $adProject->update(['config' => $config]);
+
+        return response()->json(['config' => $config]);
     }
 
     /** Microphone recording or an uploaded audio file for one scene. */
