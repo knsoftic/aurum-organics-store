@@ -11,7 +11,7 @@ class Product extends Model
 {
     protected $fillable = [
         'category_id', 'name', 'slug', 'sku', 'size_label', 'badge', 'short_description', 'description',
-        'highlights', 'price', 'compare_price', 'stock', 'track_stock', 'image', 'is_active', 'is_featured',
+        'highlights', 'price', 'compare_price', 'stock', 'track_stock', 'image', 'videos', 'is_active', 'is_featured',
         'sort_order', 'meta_title', 'meta_description',
     ];
 
@@ -19,6 +19,7 @@ class Product extends Model
     {
         return [
             'highlights' => 'array',
+            'videos' => 'array',
             'price' => 'decimal:2',
             'compare_price' => 'decimal:2',
             'track_stock' => 'boolean',
@@ -82,6 +83,12 @@ class Product extends Model
         }
 
         return $urls ?: [media_url(null)];
+    }
+
+    /** @return list<string> */
+    public function getVideoUrlsAttribute(): array
+    {
+        return array_map(fn ($path) => media_url($path), $this->videos ?? []);
     }
 
     public function getDiscountPercentAttribute(): int

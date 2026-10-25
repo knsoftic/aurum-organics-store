@@ -43,7 +43,7 @@
             <div class="card">
                 <div class="card-head"><h3>Branding</h3></div>
                 <div class="card-body" style="display:grid;gap:16px">
-                    @foreach ([['logo', 'Logo', 'Leave empty to use the elegant text logo.'], ['favicon', 'Favicon', 'Square PNG, 64×64 or larger.']] as [$key, $label, $hint])
+                    @foreach ([['logo', 'Full logo', 'Replaces the text logo completely. Leave empty to use the store name as text.'], ['brand_mark', 'Logo icon', 'Small round icon shown next to the text logo (square PNG).'], ['favicon', 'Favicon', 'Square PNG, 64×64 or larger.']] as [$key, $label, $hint])
                         <div class="field">
                             <label>{{ $label }}</label>
                             <div class="upload-box">
@@ -81,7 +81,7 @@
                     </div>
                     <div class="field full"><label>Colour theme</label>
                         <select class="select" name="theme">
-                            @foreach (['emerald' => 'Emerald & Gold', 'noir' => 'Noir & Gold', 'ivory' => 'Ivory & Bronze', 'rose' => 'Rosewood & Champagne'] as $key => $label)
+                            @foreach (['emerald' => 'Emerald & Gold', 'noir' => 'Noir & Gold', 'ivory' => 'Ivory & Bronze', 'rose' => 'Rosewood & Champagne', 'lavender' => 'Royal Purple & Lavender'] as $key => $label)
                                 <option value="{{ $key }}" @selected($v('theme', 'emerald') === $key)>{{ $label }}</option>
                             @endforeach
                         </select>
@@ -101,6 +101,14 @@
                     <div class="field full"><label>Main heading</label><input class="input" name="hero_title" value="{{ $v('hero_title') }}"><div class="hint">Wrap words in *stars* to show them in gold italics, e.g. *Liquid gold*, harvested.</div></div>
                     <div class="field full"><label>Text</label><textarea class="textarea" name="hero_subtitle" style="min-height:80px">{{ $v('hero_subtitle') }}</textarea></div>
                     <div class="field"><label>Button text</label><input class="input" name="hero_button" value="{{ $v('hero_button') }}"></div>
+                    <div class="field"><label>Image style</label>
+                        <select class="select" name="hero_image_style">
+                            <option value="float" @selected($v('hero_image_style', 'float') === 'float')>Floating (transparent PNG / cut-out)</option>
+                            <option value="arch" @selected($v('hero_image_style') === 'arch')>Photo in an arch frame</option>
+                        </select>
+                    </div>
+                    <div class="field"><label>Badge title</label><input class="input" name="hero_badge_title" value="{{ $v('hero_badge_title') }}" placeholder="Certified Pure"></div>
+                    <div class="field"><label>Badge text</label><input class="input" name="hero_badge_text" value="{{ $v('hero_badge_text') }}"></div>
                     <div class="field full">
                         <label>Hero image</label>
                         <div class="upload-box">
@@ -131,6 +139,39 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h3>Homepage highlights</h3></div>
+                <div class="card-body form-grid">
+                    @php $statRows = array_pad(old('hero_stats', setting('hero_stats', [])), 3, []); @endphp
+                    <div class="field full"><label>Hero numbers (under the buttons)</label>
+                        @foreach (array_slice($statRows, 0, 4) as $i => $stat)
+                            <div class="repeater-row" style="grid-template-columns:110px 1fr">
+                                <input class="input" name="hero_stats[{{ $i }}][value]" value="{{ $stat['value'] ?? '' }}" placeholder="100%">
+                                <input class="input" name="hero_stats[{{ $i }}][label]" value="{{ $stat['label'] ?? '' }}" placeholder="Natural">
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="field full"><label>Scrolling strip text</label><textarea class="textarea" name="marquee_items" style="min-height:90px" placeholder="One phrase per line">{{ $v('marquee_items') }}</textarea><div class="hint">One phrase per line.</div></div>
+                    @php
+                        $featureRows = array_pad(old('features', setting('features', [])), 4, []);
+                        $icons = ['leaf', 'drop', 'flask', 'shield', 'truck', 'award', 'gift', 'cash', 'refresh', 'check-circle', 'user', 'star', 'package', 'clock'];
+                    @endphp
+                    <div class="field full"><label>Feature boxes (dark band)</label>
+                        @foreach (array_slice($featureRows, 0, 4) as $i => $feature)
+                            <div class="repeater-row" style="grid-template-columns:130px 1fr 1.6fr">
+                                <select class="select" name="features[{{ $i }}][icon]">
+                                    @foreach ($icons as $icon)<option value="{{ $icon }}" @selected(($feature['icon'] ?? '') === $icon)>{{ $icon }}</option>@endforeach
+                                </select>
+                                <input class="input" name="features[{{ $i }}][title]" value="{{ $feature['title'] ?? '' }}" placeholder="Title">
+                                <input class="input" name="features[{{ $i }}][text]" value="{{ $feature['text'] ?? '' }}" placeholder="Short text">
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="field"><label>Video section small heading</label><input class="input" name="video_eyebrow" value="{{ $v('video_eyebrow') }}" placeholder="See it in action"></div>
+                    <div class="field"><label>Video section heading</label><input class="input" name="video_title" value="{{ $v('video_title') }}" placeholder="Watch the *magic*"></div>
                 </div>
             </div>
 

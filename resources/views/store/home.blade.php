@@ -4,7 +4,18 @@
     // *word* in admin-entered headings renders as gold italic.
     $fancy = fn ($text) => preg_replace('/\*(.+?)\*/', '<em>$1</em>', e($text));
     $heroImage = setting('hero_image') ? media_url(setting('hero_image')) : $hero?->image_url;
+    $heroArch = setting('hero_image_style') === 'arch';
     $reviewCount = \App\Models\Review::where('is_approved', true)->count();
+
+    $heroStats = setting('hero_stats', [['value' => '100%', 'label' => 'Natural'], ['value' => 'COD', 'label' => 'All Pakistan'], ['value' => '24h', 'label' => 'Dispatch']]);
+    $marquee = array_values(array_filter(array_map('trim', preg_split('/\r\n|\n/', (string) setting('marquee_items', "Pure & natural\nCarefully crafted\nCash on delivery\nFast delivery\nEasy returns")))));
+    $features = setting('features', [
+        ['icon' => 'leaf', 'title' => '100% Natural', 'text' => 'Made with carefully selected natural ingredients.'],
+        ['icon' => 'truck', 'title' => 'Fast Delivery', 'text' => 'Dispatched in 24 hours, delivered in '.setting('delivery_time', '2–4 days').'.'],
+        ['icon' => 'refresh', 'title' => 'Easy Returns', 'text' => setting('return_policy_short', 'Hassle-free returns on sealed products.')],
+        ['icon' => 'shield', 'title' => 'Pay Your Way', 'text' => 'Cash on Delivery, wallets, bank transfer or crypto.'],
+    ]);
+    $videoUrls = $products->flatMap(fn ($p) => $p->video_urls)->unique()->take(6)->values();
 @endphp
 
 @section('content')
@@ -22,23 +33,31 @@
                 </a>
                 <a href="#story" class="link-underline">Our Story</a>
             </div>
-            <div class="hero-stats">
-                <div><strong>100%</strong><span>Raw &amp; Pure</span></div>
-                <div><strong>Lab</strong><span>Tested Batches</span></div>
-                <div><strong>COD</strong><span>All Pakistan</span></div>
-            </div>
-        </div>
-        <div class="hero-visual reveal reveal-delay-2">
-            @if ($heroImage)
-                <img src="{{ $heroImage }}" alt="{{ setting('store_name') }}">
-            @endif
-            <div class="hero-badge">
-                <div class="seal"><x-icon name="award" style="width:22px" /></div>
-                <div>
-                    <strong>Certified Pure</strong>
-                    <small>Every batch tested for purity &amp; quality</small>
+            @if ($heroStats)
+                <div class="hero-stats">
+                    @foreach ($heroStats as $stat)
+                        <div><strong>{{ $stat['value'] }}</strong><span>{{ $stat['label'] }}</span></div>
+                    @endforeach
                 </div>
-            </div>
+            @endif
+        </div>
+        <div class="hero-visual reveal reveal-delay-2 {{ $heroArch ? 'is-arch' : '' }}">
+            @if ($heroImage)
+                @if ($heroArch)
+                    <div class="arch"><img src="{{ $heroImage }}" alt="{{ setting('store_name') }}"></div>
+                @else
+                    <img src="{{ $heroImage }}" alt="{{ setting('store_name') }}">
+                @endif
+            @endif
+            @if (setting('hero_badge_title', 'Quality Assured'))
+                <div class="hero-badge">
+                    <div class="seal"><x-icon name="award" style="width:22px" /></div>
+                    <div>
+                        <strong>{{ setting('hero_badge_title', 'Quality Assured') }}</strong>
+                        <small>{{ setting('hero_badge_text', 'Carefully made and checked before dispatch') }}</small>
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 </section>
@@ -47,7 +66,7 @@
 <div class="marquee" aria-hidden="true">
     <div class="marquee-track">
         @for ($i = 0; $i < 2; $i++)
-            <span>Raw &amp; unfiltered</span><span>Cold extracted</span><span>Single origin</span><span>Lab tested</span><span>Bottled in glass</span><span>Cash on delivery</span>
+            @foreach ($marquee as $phrase)<span>{{ $phrase }}</span>@endforeach
         @endfor
     </div>
 </div>
@@ -106,6 +125,19 @@
     </section>
 @endif
 
+{{-- ================= VIDEOS ================= --}}
+@if ($videoUrls->isNotEmpty())
+    <section class="section bg-dark video-section" id="videos">
+        <div class="container">
+            <div class="section-head center reveal">
+                <span class="eyebrow center">{{ setting('video_eyebrow', 'See it in action') }}</span>
+                <h2 class="section-title">{!! $fancy(setting('video_title', 'Watch the *difference*')) !!}</h2>
+            </div>
+            @include('store.partials.videos', ['urls' => $videoUrls])
+        </div>
+    </section>
+@endif
+
 {{-- ================= STORY ================= --}}
 <section class="section bg-cream" id="story">
     <div class="container story">
@@ -127,16 +159,11 @@
 <section class="bg-dark">
     <div class="container">
         <div class="features">
-            @foreach ([
-                ['leaf', '100% Natural', 'No sugar syrups, no additives, no preservatives — ever.'],
-                ['flask', 'Lab Tested', 'Every batch is tested for purity before it is bottled.'],
-                ['truck', 'Fast Delivery', 'Dispatched in 24 hours, delivered in '.setting('delivery_time', '2–4 days').'.'],
-                ['shield', 'Pay Your Way', 'Cash on Delivery, wallets, bank transfer or crypto.'],
-            ] as $i => [$icon, $title, $text])
+            @foreach ($features as $i => $feature)
                 <div class="feature reveal reveal-delay-{{ $i }}">
-                    <div class="ico"><x-icon :name="$icon" /></div>
-                    <h3>{{ $title }}</h3>
-                    <p>{{ $text }}</p>
+                    <div class="ico"><x-icon :name="$feature['icon'] ?? 'leaf'" /></div>
+                    <h3>{{ $feature['title'] }}</h3>
+                    <p>{{ $feature['text'] ?? '' }}</p>
                 </div>
             @endforeach
         </div>
@@ -216,7 +243,11 @@
             <div>
                 <span class="eyebrow">Order with confidence</span>
                 <h2>Delivered to your door. Pay when it arrives.</h2>
-                <p>Cash on Delivery across Pakistan{{ setting('free_shipping_min') ? ' · Free delivery above '.money(setting('free_shipping_min')) : '' }}.</p>
+                @if ((float) setting('shipping_fee', 0) <= 0)
+                    <p>Free delivery and Cash on Delivery all over Pakistan.</p>
+                @else
+                    <p>Cash on Delivery across Pakistan{{ (float) setting('free_shipping_min') > 0 ? ' · Free delivery above '.money(setting('free_shipping_min')) : '' }}.</p>
+                @endif
             </div>
             <div class="actions">
                 <a href="{{ route('shop') }}" class="btn btn-gold">Shop Now <x-icon name="arrow-right" /></a>

@@ -26,12 +26,18 @@ class SettingController extends Controller
         // Storefront
         'store_mode' => 'required|in:single,multi',
         'featured_product_id' => 'nullable|integer',
-        'theme' => 'required|in:emerald,noir,ivory,rose',
+        'theme' => 'required|in:emerald,noir,ivory,rose,lavender',
         'announcement_text' => 'nullable|string|max:200',
         'hero_eyebrow' => 'nullable|string|max:80',
         'hero_title' => 'nullable|string|max:150',
         'hero_subtitle' => 'nullable|string|max:400',
         'hero_button' => 'nullable|string|max:40',
+        'hero_image_style' => 'nullable|in:float,arch',
+        'hero_badge_title' => 'nullable|string|max:60',
+        'hero_badge_text' => 'nullable|string|max:120',
+        'marquee_items' => 'nullable|string|max:600',
+        'video_eyebrow' => 'nullable|string|max:60',
+        'video_title' => 'nullable|string|max:120',
         'about_eyebrow' => 'nullable|string|max:80',
         'about_title' => 'nullable|string|max:150',
         'about_text' => 'nullable|string|max:3000',
@@ -56,7 +62,7 @@ class SettingController extends Controller
 
     protected const BOOLEANS = ['announcement_active', 'auto_approve_reviews', 'show_whatsapp_button'];
 
-    protected const IMAGES = ['logo', 'favicon', 'hero_image', 'about_image'];
+    protected const IMAGES = ['logo', 'brand_mark', 'favicon', 'hero_image', 'about_image'];
 
     public function edit()
     {
@@ -72,6 +78,13 @@ class SettingController extends Controller
             'faqs' => 'nullable|array|max:20',
             'faqs.*.q' => 'nullable|string|max:200',
             'faqs.*.a' => 'nullable|string|max:1000',
+            'hero_stats' => 'nullable|array|max:4',
+            'hero_stats.*.value' => 'nullable|string|max:12',
+            'hero_stats.*.label' => 'nullable|string|max:40',
+            'features' => 'nullable|array|max:4',
+            'features.*.icon' => 'nullable|string|max:30',
+            'features.*.title' => 'nullable|string|max:40',
+            'features.*.text' => 'nullable|string|max:160',
         ];
         foreach (self::IMAGES as $image) {
             $rules[$image] = $image === 'favicon' ? 'nullable|image|mimes:png,jpg,jpeg,webp,ico|max:1024' : 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096';
@@ -89,6 +102,12 @@ class SettingController extends Controller
         $values['faqs'] = collect($data['faqs'] ?? [])
             ->filter(fn ($f) => filled($f['q'] ?? null) && filled($f['a'] ?? null))
             ->map(fn ($f) => ['q' => trim($f['q']), 'a' => trim($f['a'])])->values()->all();
+        $values['hero_stats'] = collect($data['hero_stats'] ?? [])
+            ->filter(fn ($s) => filled($s['value'] ?? null) && filled($s['label'] ?? null))
+            ->map(fn ($s) => ['value' => trim($s['value']), 'label' => trim($s['label'])])->values()->all();
+        $values['features'] = collect($data['features'] ?? [])
+            ->filter(fn ($f) => filled($f['title'] ?? null))
+            ->map(fn ($f) => ['icon' => $f['icon'] ?: 'leaf', 'title' => trim($f['title']), 'text' => trim((string) ($f['text'] ?? ''))])->values()->all();
 
         Setting::setMany($values);
 

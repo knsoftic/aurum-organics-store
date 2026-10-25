@@ -133,6 +133,28 @@
     });
   });
 
+  /* ---------- Click-to-play videos (one at a time, with sound) ---------- */
+  document.addEventListener('click', (e) => {
+    const nav = e.target.closest('[data-video-scroll]');
+    if (!nav) return;
+    const track = nav.closest('[data-video-strip]').querySelector('[data-video-track]');
+    const card = track.querySelector('.video-card');
+    track.scrollBy({ left: (card ? card.offsetWidth + 22 : 300) * parseInt(nav.dataset.videoScroll, 10), behavior: 'smooth' });
+  });
+  document.addEventListener('click', (e) => {
+    const card = e.target.closest('[data-video]');
+    if (!card || card.classList.contains('playing')) return;
+    $$('[data-video].playing').forEach((other) => {
+      const v = other.querySelector('video');
+      v.pause(); v.controls = false; other.classList.remove('playing');
+    });
+    const video = card.querySelector('video');
+    video.muted = false;
+    video.controls = true;
+    card.classList.add('playing');
+    video.play().catch(() => { video.muted = true; video.play(); });
+  });
+
   /* ---------- Copy to clipboard ---------- */
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-copy]');

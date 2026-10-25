@@ -22,6 +22,9 @@ echo "==> Maintenance mode ON"
 trap '"$PHP_BIN" artisan up >/dev/null 2>&1 || true' EXIT
 
 echo "==> Latest code (git pull)"
+# Folder is owned by the web user; let root run git here without "dubious ownership" errors.
+git config --global --get-all safe.directory 2>/dev/null | grep -qx "$SITE_DIR" || git config --global --add safe.directory "$SITE_DIR"
+git config core.fileMode false
 git pull --ff-only origin main
 
 echo "==> Composer packages"

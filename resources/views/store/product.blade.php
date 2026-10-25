@@ -115,6 +115,18 @@
     </div>
 </div>
 
+@if ($product->video_urls)
+    <section class="section bg-dark video-section" id="videos">
+        <div class="container">
+            <div class="section-head center">
+                <span class="eyebrow center">{{ setting('video_eyebrow', 'See it in action') }}</span>
+                <h2 class="section-title">{!! preg_replace('/\*(.+?)\*/', '<em>$1</em>', e(setting('video_title', 'Watch the *difference*'))) !!}</h2>
+            </div>
+            @include('store.partials.videos', ['urls' => $product->video_urls])
+        </div>
+    </section>
+@endif
+
 {{-- Reviews --}}
 <section class="section bg-cream" id="reviews">
     <div class="container reviews-wrap">

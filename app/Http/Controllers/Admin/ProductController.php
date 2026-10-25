@@ -72,6 +72,9 @@ class ProductController extends Controller
         foreach ($product->images as $image) {
             $this->deleteUpload($image->path);
         }
+        foreach ($product->videos ?? [] as $video) {
+            $this->deleteUpload($video);
+        }
         $product->delete();
 
         return redirect()->route('admin.products.index')->with('success', 'Product deleted.');
@@ -106,7 +109,12 @@ class ProductController extends Controller
             'meta_description' => 'nullable|string|max:500',
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
             'gallery.*' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096',
-        ], ['compare_price.gte' => 'The compare-at price must be higher than the selling price.']);
+            'new_videos.*' => 'nullable|file|mimetypes:video/mp4,video/webm,video/quicktime|max:51200',
+            'remove_videos' => 'nullable|array',
+        ], [
+            'compare_price.gte' => 'The compare-at price must be higher than the selling price.',
+            'new_videos.*.max' => 'Each video must be 50 MB or smaller.',
+        ]);
 
         $data['slug'] = Str::slug($data['slug'] ?: $data['name']);
         $data['highlights'] = collect(preg_split('/\r\n|\n/', (string) ($data['highlights'] ?? '')))
@@ -116,9 +124,31 @@ class ProductController extends Controller
         $data['is_featured'] = $request->boolean('is_featured');
         $data['sort_order'] = (int) ($data['sort_order'] ?? 0);
         $data['image'] = $this->replaceUpload($request->file('image'), $product?->image, 'products', $request->boolean('remove_image'));
-        unset($data['gallery']);
+        $data['videos'] = $this->syncVideos($request, $product);
+        unset($data['gallery'], $data['new_videos'], $data['remove_videos']);
 
         return $data;
+    }
+
+    /** Keep existing videos minus the ones ticked for removal, then append new uploads. */
+    protected function syncVideos(Request $request, ?Product $product): array
+    {
+        $remove = (array) $request->input('remove_videos', []);
+        $videos = [];
+
+        foreach ($product?->videos ?? [] as $path) {
+            if (in_array($path, $remove, true)) {
+                $this->deleteUpload($path);
+            } else {
+                $videos[] = $path;
+            }
+        }
+
+        foreach ((array) $request->file('new_videos', []) as $file) {
+            $videos[] = $this->storeUpload($file, 'products/videos');
+        }
+
+        return $videos;
     }
 
     protected function syncImages(Request $request, Product $product): void

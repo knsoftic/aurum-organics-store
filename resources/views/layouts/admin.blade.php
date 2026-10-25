@@ -19,7 +19,7 @@
     $nameParts = preg_split('/\s+/', $storeName, 2);
 @endphp
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="{{ setting('theme', 'emerald') }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -36,6 +36,7 @@
 <div class="admin">
     <aside class="sidebar" id="sidebar">
         <div class="side-brand">
+            @if (setting('brand_mark'))<img src="{{ media_url(setting('brand_mark')) }}" alt="" style="width:40px;height:40px;border-radius:50%;margin-bottom:10px">@endif
             <span class="name">{{ strtoupper($nameParts[0]) }}</span>
             <small>{{ $nameParts[1] ?? 'Store' }} · Admin</small>
         </div>

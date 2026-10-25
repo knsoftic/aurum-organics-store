@@ -63,6 +63,24 @@
             </div>
 
             <div class="card">
+                <div class="card-head"><h3>Videos</h3></div>
+                <div class="card-body">
+                    @if ($product->videos)
+                        <div class="gallery-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));margin-bottom:12px">
+                            @foreach ($product->videos as $video)
+                                <div class="g">
+                                    <video src="{{ media_url($video) }}#t=0.5" preload="metadata" muted style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#000"></video>
+                                    <label class="switch" style="font-weight:400;margin-top:6px"><input type="checkbox" name="remove_videos[]" value="{{ $video }}"><span class="track"></span> Remove</label>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                    <input type="file" name="new_videos[]" accept="video/mp4,video/webm,video/quicktime" multiple>
+                    <div class="hint">MP4 recommended, up to 50 MB each (your server's PHP upload limit must allow it). Shown in a "See it in action" section on the product and home pages.</div>
+                </div>
+            </div>
+
+            <div class="card">
                 <div class="card-head"><h3>SEO</h3></div>
                 <div class="card-body form-grid">
                     <div class="field full"><label>Meta title</label><input class="input" name="meta_title" value="{{ old('meta_title', $product->meta_title) }}" maxlength="160"></div>

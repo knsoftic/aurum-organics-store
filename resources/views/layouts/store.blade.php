@@ -17,6 +17,7 @@
     <meta property="og:type" content="website">
     @hasSection('og_image')<meta property="og:image" content="@yield('og_image')">@endif
     <link rel="icon" href="{{ setting('favicon') ? media_url(setting('favicon')) : asset('favicon.ico') }}">
+    <meta name="theme-color" content="{{ ['lavender' => '#3b1a6b', 'noir' => '#161616', 'ivory' => '#4b4537', 'rose' => '#4a2a2f'][setting('theme')] ?? '#1f3a2e' }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -40,15 +41,7 @@
             </nav>
         </div>
 
-        <a href="{{ route('home') }}" class="brand" aria-label="{{ $storeName }} home">
-            @if (setting('logo'))
-                <img src="{{ media_url(setting('logo')) }}" alt="{{ $storeName }}">
-            @else
-                @php $parts = preg_split('/\s+/', $storeName, 2); @endphp
-                <span class="brand-name">{{ strtoupper($parts[0]) }}</span>
-                @if (! empty($parts[1]))<span class="brand-sub">{{ $parts[1] }}</span>@endif
-            @endif
-        </a>
+        @include('store.partials.brand')
 
         <div class="header-actions">
             <nav class="nav" aria-label="Secondary" style="margin-right:18px">
@@ -88,11 +81,7 @@
     <div class="container">
         <div class="footer-grid">
             <div>
-                <a href="{{ route('home') }}" class="brand">
-                    @php $parts = preg_split('/\s+/', $storeName, 2); @endphp
-                    <span class="brand-name">{{ strtoupper($parts[0]) }}</span>
-                    @if (! empty($parts[1]))<span class="brand-sub">{{ $parts[1] }}</span>@endif
-                </a>
+                @include('store.partials.brand')
                 <p style="max-width:320px;font-weight:300">{{ setting('footer_text', setting('tagline')) }}</p>
                 <div class="socials">
                     @foreach (['facebook', 'instagram', 'tiktok', 'youtube'] as $network)
@@ -126,7 +115,7 @@
                 </ul>
             </div>
             <div>
-                <h4>Get in touch</h4>
+                @if (setting('store_phone') || setting('store_email') || setting('store_address'))<h4>Get in touch</h4>@endif
                 <ul>
                     @if (setting('store_phone'))<li style="display:flex;gap:10px"><x-icon name="phone" style="width:18px;flex:none;color:var(--gold-2)" /> <a href="tel:{{ preg_replace('/[^0-9+]/', '', setting('store_phone')) }}">{{ setting('store_phone') }}</a></li>@endif
                     @if (setting('store_email'))<li style="display:flex;gap:10px"><x-icon name="mail" style="width:18px;flex:none;color:var(--gold-2)" /> <a href="mailto:{{ setting('store_email') }}">{{ setting('store_email') }}</a></li>@endif

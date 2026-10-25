@@ -13,7 +13,7 @@ class Setting extends Model
     protected const CACHE_KEY = 'store.settings';
 
     /** JSON-encoded settings (repeatable rows edited in the admin). */
-    public const JSON_KEYS = ['faqs'];
+    public const JSON_KEYS = ['faqs', 'hero_stats', 'features'];
 
     public static function allCached(): array
     {

@@ -53,6 +53,7 @@
         'trend' => '<path d="m3.5 16.5 5.5-5.5 4 4 7.5-7.5"/><path d="M15 7.5h5.5V13"/>',
         'wallet' => '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h5M3 9.5h15"/>',
         'alert' => '<path d="M12 4 21 19.5H3z"/><path d="M12 10v4.5M12 17v.01"/>',
+        'play' => '<path d="M7 4.5v15l12.5-7.5z" fill="currentColor" stroke="none"/>',
         'external' => '<path d="M14 4.5h5.5V10M19.5 4.5 11 13M18 14v4.5a1 1 0 0 1-1 1H5.5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1H10"/>',
     ];
 @endphp
