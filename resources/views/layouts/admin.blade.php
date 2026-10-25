@@ -2,19 +2,22 @@
     $nav = [
         ['Overview', null],
         ['Dashboard', 'admin.dashboard', 'grid', null, 'admin.dashboard'],
+        ['Sales', null],
         ['Orders', 'admin.orders.index', 'receipt', $adminBadges['orders'], 'admin.orders.*'],
+        ['Payment Methods', 'admin.payment-methods.index', 'card', null, 'admin.payment-methods.*'],
+        ['Coupons', 'admin.coupons.index', 'tag', null, 'admin.coupons.*'],
         ['Catalog', null],
         ['Products', 'admin.products.index', 'package', null, 'admin.products.*'],
         ['Categories', 'admin.categories.index', 'folder', null, 'admin.categories.*'],
         ['Reviews', 'admin.reviews.index', 'star', $adminBadges['reviews'], 'admin.reviews.*'],
-        ['Sales', null],
-        ['Payment Methods', 'admin.payment-methods.index', 'card', null, 'admin.payment-methods.*'],
-        ['Coupons', 'admin.coupons.index', 'tag', null, 'admin.coupons.*'],
+        ['Marketing', null],
         ['Ad Studio', 'admin.ad-studio.index', 'play', null, 'admin.ad-studio.*'],
         ['Content', null],
         ['Pages', 'admin.pages.index', 'file', null, 'admin.pages.*'],
         ['Messages', 'admin.messages.index', 'inbox', $adminBadges['messages'], 'admin.messages.*'],
+        ['Account', null],
         ['Settings', 'admin.settings.edit', 'settings', null, 'admin.settings.*'],
+        ['My Profile', 'admin.profile', 'user', null, 'admin.profile'],
     ];
     $storeName = setting('store_name', config('app.name'));
     $nameParts = preg_split('/\s+/', $storeName, 2);
@@ -57,24 +60,28 @@
             <a href="{{ route('home') }}" target="_blank" class="flex"><x-icon name="external" style="width:16px" /> View store</a>
         </div>
     </aside>
+    <div class="side-backdrop" data-toggle-sidebar></div>
 
     <div class="main">
         <header class="topbar">
-            <div class="flex">
+            <div class="top-title">
                 <button class="icon-action menu-btn" type="button" data-toggle-sidebar aria-label="Menu"><x-icon name="menu" /></button>
-                <div>
+                <div class="top-heading">
                     <div class="crumb">@yield('crumb', 'Admin')</div>
                     <h1>@yield('title', 'Dashboard')</h1>
                 </div>
             </div>
-            <div class="top-actions">
-                @yield('actions')
+            {{-- Page buttons; on phones they move to their own row under the title. --}}
+            @hasSection('actions')
+                <div class="top-actions">@yield('actions')</div>
+            @endif
+            <div class="top-user">
                 @if ($adminBadges['payments'])
                     <a href="{{ route('admin.orders.index', ['payment_status' => 'pending_verification']) }}" class="btn btn-light btn-sm" title="Payments awaiting verification">
-                        <x-icon name="wallet" /> {{ $adminBadges['payments'] }} to verify
+                        <x-icon name="wallet" /> {{ $adminBadges['payments'] }}<span class="hide-sm"> to verify</span>
                     </a>
                 @endif
-                <a href="{{ route('admin.profile') }}" class="user-chip">
+                <a href="{{ route('admin.profile') }}" class="user-chip" title="My profile">
                     <span class="av">{{ mb_substr(auth()->user()->name, 0, 1) }}</span><span class="n">{{ auth()->user()->name }}</span>
                 </a>
                 <form method="POST" action="{{ route('admin.logout') }}" class="inline-form">

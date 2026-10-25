@@ -42,7 +42,7 @@ class DashboardController extends Controller
                 'messages_unread' => ContactMessage::where('is_read', false)->count(),
             ],
             'chart' => $chart,
-            'statusBreakdown' => Order::selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status'),
+            'statusBreakdown' => Order::selectRaw('status, COUNT(*) as aggregate')->groupBy('status')->pluck('aggregate', 'status'),
             'recentOrders' => Order::latest()->take(8)->get(),
             'pendingPayments' => Payment::with('order')->where('status', Payment::STATUS_PENDING)->latest()->take(5)->get(),
             'topProducts' => Product::query()

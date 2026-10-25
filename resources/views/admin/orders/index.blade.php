@@ -43,7 +43,7 @@
                     <tr>
                         <td><a href="{{ route('admin.orders.show', $order) }}" class="cell-main">#{{ $order->order_number }}</a><div class="cell-sub">{{ $order->created_at->format('d M Y, h:i A') }}</div></td>
                         <td><div>{{ $order->customer_name }}</div><div class="cell-sub">{{ $order->phone }} · {{ $order->city }}</div></td>
-                        <td class="cell-sub">{{ $order->items->map(fn ($i) => $i->product_name.' ×'.$i->quantity)->implode(', ') }}</td>
+                        <td class="cell-sub" style="min-width:150px">{{ $order->items->map(fn ($i) => $i->product_name.' ×'.$i->quantity)->implode(', ') }}</td>
                         <td>
                             <span class="badge b-{{ \App\Models\Order::statusColor($order->payment_status) }}">{{ $order->payment_status_label }}</span>
                             <div class="cell-sub">{{ $order->payment_method_name }}</div>

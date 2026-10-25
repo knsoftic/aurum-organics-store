@@ -83,7 +83,7 @@
                 <div class="preview-stage"><canvas id="previewCanvas"></canvas><div class="preview-busy" id="previewBusy">Preparing…</div></div>
                 <div class="flex" style="margin-top:12px">
                     <button type="button" class="btn btn-light btn-sm" id="previewPlay"><x-icon name="play" /> Play</button>
-                    <input type="range" id="previewTime" min="0" max="10" step="0.033" value="1.5" style="flex:1;accent-color:var(--gold)">
+                    <input type="range" id="previewTime" min="0" max="10" step="0.033" value="1.5" style="flex:1;min-width:0;accent-color:var(--gold)">
                     <span class="muted" id="previewClock" style="font-size:12px;min-width:70px;text-align:right">0.0s</span>
                 </div>
                 <div class="flex between wrap" style="margin-top:10px;gap:8px">

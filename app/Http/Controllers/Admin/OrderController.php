@@ -19,7 +19,7 @@ class OrderController extends Controller
     {
         return view('admin.orders.index', [
             'orders' => $this->filtered($request)->with('items')->latest()->paginate(20)->withQueryString(),
-            'counts' => Order::selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status'),
+            'counts' => Order::selectRaw('status, COUNT(*) as aggregate')->groupBy('status')->pluck('aggregate', 'status'),
             'pendingVerification' => Order::where('payment_status', 'pending_verification')->count(),
         ]);
     }
