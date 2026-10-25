@@ -35,6 +35,11 @@ php artisan migrate:fresh --seed
    `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env` (defaults: `admin@aurum.test` /
    `Admin@12345`). Change the password from **My Profile** right away.
 
+> Locally, don't run `php artisan optimize` / `route:cache` while the app is
+> served from a sub-folder (`localhost/organic/public`) — Laravel's cached
+> router then returns 405 on the home page. It works normally at a domain root
+> (production). Undo with `php artisan optimize:clear`.
+
 ## Features
 
 **Storefront** — luxury responsive design (4 colour themes), hero, collection
@@ -53,6 +58,12 @@ pages, contact messages, store settings (branding, hero, story, FAQ, delivery
 fees, theme, SEO, social), admin profile.
 
 **Payments** — see [docs/PAYMENT_GATEWAYS.md](docs/PAYMENT_GATEWAYS.md).
+
+## Deploy on aaPanel
+
+Step-by-step guide (Roman Urdu) for `knorganic.site`:
+[docs/DEPLOY_AAPANEL.md](docs/DEPLOY_AAPANEL.md). Later updates on the server
+are one command: `bash deploy.sh`.
 
 ## Going live checklist
 

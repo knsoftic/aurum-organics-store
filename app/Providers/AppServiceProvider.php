@@ -13,6 +13,7 @@ use App\Payments\GatewayManager;
 use App\Services\CartService;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -28,6 +29,12 @@ class AppServiceProvider extends ServiceProvider
     {
         Schema::defaultStringLength(191);
         Paginator::defaultView('partials.pagination');
+
+        // Behind SSL-terminating proxies (Cloudflare, load balancers) the request looks like
+        // plain HTTP; keep generated links on HTTPS when the site URL is HTTPS.
+        if (str_starts_with((string) config('app.url'), 'https://')) {
+            URL::forceScheme('https');
+        }
 
         View::composer('layouts.store', function ($view) {
             $cart = app(CartService::class);

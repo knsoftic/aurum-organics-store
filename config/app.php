@@ -15,6 +15,10 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    // First admin account created by `php artisan db:seed`.
+    'admin_email' => env('ADMIN_EMAIL', 'admin@aurum.test'),
+    'admin_password' => env('ADMIN_PASSWORD', 'Admin@12345'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

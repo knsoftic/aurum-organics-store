@@ -19,9 +19,9 @@ class DatabaseSeeder extends Seeder
     {
         $this->copyAssets();
 
-        User::updateOrCreate(['email' => env('ADMIN_EMAIL', 'admin@aurum.test')], [
+        User::updateOrCreate(['email' => config('app.admin_email')], [
             'name' => 'Store Admin',
-            'password' => env('ADMIN_PASSWORD', 'Admin@12345'),
+            'password' => config('app.admin_password'),
             'is_admin' => true,
         ]);
 
